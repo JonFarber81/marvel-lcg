@@ -52,6 +52,7 @@ class NetLib:
     @staticmethod
     def IsPortAvailable(address: str, port: int) -> bool:
         import socket
+        import sys
         port_available = True
 
         if ':' in address:
@@ -61,6 +62,11 @@ class NetLib:
 
         s = socket.socket(family, socket.SOCK_STREAM)
         try:
+            # aiohttp's TCPSite binds with reuse_address on POSIX, so match it here.
+            # Without this the check fails on a port whose old connections are still
+            # lingering in FIN_WAIT_2/TIME_WAIT, even though the server could bind.
+            if hasattr(socket, 'SO_REUSEADDR') and sys.platform != 'win32':
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((address, port))
         except:
             port_available = False
