@@ -8,3 +8,5 @@
 /crash.log
 /statistics.json
 /deck/*.json
+/venv/
+/.venv/
