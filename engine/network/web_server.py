@@ -120,11 +120,40 @@ class WebServer:
                 return await handle(request)
         self.web_app.router.add_post(path, new_handle)
 
+    # Gzipped payloads keyed by file path, each held with the mtime and size it
+    # was built from.
+    json_gzip_cache: Dict[str, Tuple[Tuple[int, int], bytes]] = {}
+
+    @final
+    def LoadJsonGZip(self, file_path: str) -> bytes:
+        # Every request used to re-read, re-parse, re-checksum and re-gzip the
+        # file to produce identical bytes: ~235ms per 2.1MB cards.json, and one
+        # repeat of any checksum warning per request. Key the result on mtime and
+        # size so edits on disk are still picked up without a restart.
+        import os
+
+        try:
+            stat = os.stat(file_path)
+            stamp = (stat.st_mtime_ns, stat.st_size)
+        except OSError:
+            stamp = None
+
+        if stamp:
+            cached = WebServer.json_gzip_cache.get(file_path)
+            if cached and cached[0] == stamp:
+                return cached[1]
+
+        compressed_data = Json.DumpGZip(Json.Load(file_path))
+
+        if stamp:
+            WebServer.json_gzip_cache[file_path] = (stamp, compressed_data)
+
+        return compressed_data
+
     @final
     def ReadJsonFile(self, file_path: str|None, *, do_cache: bool=True) -> web.Response:
         if file_path:
-            data = Json.Load(file_path)
-            compressed_data = Json.DumpGZip(data)
+            compressed_data = self.LoadJsonGZip(file_path)
             headers = {'Content-Encoding': 'gzip'}
 
             if do_cache:
