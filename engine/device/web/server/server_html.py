@@ -13,6 +13,7 @@ class GameServerHTML(GameServerBase):
         self.AddHtmlSecurity('/deck', './public/deck.html')
         self.AddHtmlSecurity('/cards', './public/cards.html')
         self.AddHtmlSecurity('/scene', './public/scene.html')
+        self.AddHtmlSecurity('/tutorial', './public/tutorial.html')
         self.AddHtmlSecurity('/replay', './public/replay.html')
         self.AddHtmlSecurity('/puzzle', './public/replay.html')
         self.AddHtmlSecurity('/credits', './public/credits.html')

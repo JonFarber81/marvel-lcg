@@ -63,11 +63,13 @@ import { Scene } from './scene.js';
 import { AutoActivate } from './auto_activate.js';
 import { ErrorDialog } from './error_dialog.js';
 import { Message } from './message.js';
+import { Tutorial } from './tutorial.js';
 Scene.init()
 
 UI.init()
 ErrorDialog.init()
 Message.init()
+Tutorial.init()
 UI.update()
 Button.initializeButtons()
 Button.doShow()

@@ -5,7 +5,8 @@ The open-source of Marvel LCG digital version on [ITCH](https://irefrixs.itch.io
 | Guide                                                          | Description                       |
 | -------------------------------------------------------------- | --------------------------------- |
 | [Install Guide](docs/install_guide.md)                         | How to install and run the game   |
-| [How to Play](https://itch.io/t/3763917/how-to-play-this-game) | Game rules and controls           |
+| How to Play (in app: **How to Play** on the main menu, or `/tutorial`) | Rules, controls, and a guided first game |
+| [How to Play (itch.io)](https://itch.io/t/3763917/how-to-play-this-game) | The same guide, plus troubleshooting |
 | [Card Scripting Guide](docs/card_scripting_guide.md)           | How to write card ability scripts |
 | [Engine Architecture](docs/engine_architecture.md)             | Engine internals for developers   |
 | [Debug Guide](docs/debug_guide.md)                             | How to debug the game             |

@@ -23,6 +23,7 @@ export class Setting {
     static ver: number = 1
     static scene_3d: boolean = search_params.has('3d_scene') || search_params.has('3d')
     static is_remote: boolean = search_params.has('remote')
+    static is_tutorial = search_params.has('tutorial')
     static {
         if( window.location.pathname == '/marvel2.html') {
             Setting.ver = 2

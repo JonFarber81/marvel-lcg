@@ -1,0 +1,135 @@
+/* Guided first game: the contextual hint panel driven by `tutorial.ts`.
+   Only loaded when the game is opened with `?tutorial`. */
+
+#tutorial-coach {
+    --accent: #7dbb55;
+
+    position: fixed;
+    left: 1rem;
+    bottom: 1rem;
+    width: 25rem;
+    max-width: calc(100vw - 2rem);
+    z-index: 150;
+
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 1rem;
+    line-height: 1.45;
+    color: #e8e8e8;
+    text-align: left;
+
+    background-color: #343a40;
+    border: 1px solid #495057;
+    border-left: 4px solid var(--accent);
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+#tutorial-coach.hide {
+    display: none !important;
+}
+
+.tutorial-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.5rem;
+    background-color: rgba(0, 0, 0, 0.35);
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #adb5bd;
+    cursor: pointer;
+    user-select: none;
+}
+
+.tutorial-head-label {
+    flex: auto;
+}
+
+#tutorial-coach.collapsed .tutorial-head-label::after {
+    content: " \2014  click to open";
+    color: var(--accent);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.tutorial-head-toggle {
+    width: 1.2rem;
+    text-align: center;
+    color: #adb5bd;
+}
+
+.tutorial-head-toggle::after {
+    content: "\2212"; /* minus */
+}
+
+#tutorial-coach.collapsed .tutorial-head-toggle::after {
+    content: "+";
+}
+
+#tutorial-coach.collapsed .tutorial-body,
+#tutorial-coach.collapsed .tutorial-foot {
+    display: none;
+}
+
+.tutorial-body {
+    padding: 0.6rem 0.75rem;
+    max-height: 45vh;
+    overflow-y: auto;
+}
+
+.tutorial-title {
+    margin-bottom: 0.35rem;
+    font-size: 1.15rem;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.tutorial-text b {
+    color: #ffffff;
+}
+
+.tutorial-text ul {
+    margin: 0.35rem 0 0 1.1rem;
+}
+
+.tutorial-text li {
+    margin-bottom: 0.2rem;
+}
+
+.tutorial-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid #495057;
+}
+
+.tutorial-foot button {
+    padding: 0.3rem 0.75rem;
+    font-size: 0.95rem;
+    color: white;
+    border: none;
+    border-radius: 0.2rem;
+    cursor: pointer;
+}
+
+#tutorial-next {
+    background-color: #28a745;
+}
+
+#tutorial-next:hover {
+    background-color: #218838;
+}
+
+#tutorial-stop {
+    margin-left: auto;
+    background-color: transparent;
+    color: #adb5bd;
+    text-decoration: underline;
+}
+
+#tutorial-stop:hover {
+    color: #ffffff;
+}

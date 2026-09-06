@@ -2,6 +2,7 @@ import { ButtonSetting, Setting } from './settings.js'
 import { Game } from './game.js'
 import { Cards } from './cards.js'
 import { WorldDescriptor } from './descriptor.js'
+import { Tutorial } from './tutorial.js'
 import { Effect } from './effect.js'
 import { Button } from './buttons.js'
 import { Music } from './music.js'
@@ -513,6 +514,7 @@ export class Client {
 
                 UI.setPhaseText(Game.world_descriptor.phase)
                 showRes()
+                Tutorial.onWorldUpdate()
 
                 wait_next_frame()
             }
