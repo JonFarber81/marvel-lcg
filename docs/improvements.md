@@ -58,7 +58,7 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 | 4.3 | **Surface undo depth.** `GameSession.Undo(n)` (`game_session.py:194`) is implemented server-side. If the client only exposes single-step undo, add an undo-N control with a short history list. | P2 | S |
 | 4.4 | **Campaign mode beyond Red Skull.** `mode_campaign` is gated to "The Rise of Red Skull". The Galaxy's Most Wanted, Mad Titan's Shadow, Sinister Motives, Mutant Genesis, NeXt Evolution, Age of Apocalypse and Civil War sets are all present; extend the campaign log to them one box at a time. | P2 | L |
 | 4.5 | **Per-scenario win record on tiles.** `/get_completion_rate` and `game/rule/statistics.py` exist; show wins/plays and best hero on each scenario button. | P3 | S |
-| 4.6 | **Guided first game.** No tutorial or "how to play" text ships in the app (the link on itch.io is the only guide). A scripted Core Set Rhino/Spider-Man walkthrough with contextual hints would lower the barrier considerably. | P2 | L |
+| 4.6 | **DONE** - A **How to Play** page now ships in the app (`public/tutorial.html`, routed at `/tutorial`, linked from the main menu): rules primer, the round structure, and this build's actual controls. Its **Start the guided game** button builds the same payload the New Game screen posts, pre-filled with Core Set Rhino + the Spider-Man starter deck, and opens the board with `?tutorial`. There, `public/js/marvel/tutorial.ts` watches each world render and shows 14 contextual hints — mulligan, alter-ego vs hero form, paying costs, the threat clock (with live numbers), the four villain-phase steps, engaged minions, Rhino advancing, and a closing hint that explains the win or loss — each fired by game state rather than a fixed script, so the player is never blocked or led. | P2 | L |
 | 4.7 | **Fill the scenario gaps.** Missing files: `god_of_lies` (+ expert), `iron_man_expert`, `captain_marvel_expert`, `captain_america_expert`, `spider_woman_expert` (Civil War), `2425_boss_rush`, and `age_of_apocalypse_WIP.json` is still WIP. | P2 | M |
 | 4.8 | **Timeout slider defaults to disabled** with no explanation of when it applies (online only). Add helper text. | P3 | S |
 
@@ -78,4 +78,4 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 1. ~~§2.1, §2.2, §1.2, §3.1~~ — **done** (plus §3.1a, a latent race the speedup uncovered).
 2. §1.3, §1.4, §4.2 — first-session experience: progress, hero gallery, resume.
 3. §5.6 then §5.2 — get a regression net in place before touching the message pipeline.
-4. §4.4, §4.6 — the two large playability investments.
+4. §4.4 — the remaining large playability investment (~~§4.6~~ **done**).

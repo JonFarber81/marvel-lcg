@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Play</title>
+    <style>
+        body {
+            background-color: rgb(43, 43, 43);
+            color: rgb(198, 198, 198);
+            display: flex;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+
+        .guide {
+            max-width: 52rem;
+            padding: 2rem 1.5rem 4rem;
+            line-height: 1.5;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 0.25rem;
+        }
+
+        h2 {
+            color: white;
+            margin-top: 2.5rem;
+            border-bottom: 1px solid #555;
+            padding-bottom: 0.25rem;
+        }
+
+        h3 {
+            color: white;
+            margin-top: 1.5rem;
+            font-size: 1.1rem;
+        }
+
+        p, ul, ol {
+            margin: 0.6rem 0;
+        }
+
+        li {
+            margin-bottom: 0.3rem;
+        }
+
+        a {
+            color: skyblue;
+        }
+
+        b {
+            color: white;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin: 0.75rem 0;
+            width: 100%;
+        }
+
+        th, td {
+            border: 1px solid #555;
+            padding: 0.35rem 0.6rem;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background-color: #383838;
+            color: white;
+        }
+
+        kbd {
+            background-color: #1f1f1f;
+            border: 1px solid #555;
+            border-radius: 3px;
+            padding: 0 0.35rem;
+            font-family: monospace;
+            color: white;
+            white-space: nowrap;
+        }
+
+        .lead {
+            font-size: 1.1rem;
+        }
+
+        .start-box {
+            background-color: #383838;
+            border: 1px solid #555;
+            border-left: 4px solid #7dbb55;
+            border-radius: 0.5rem;
+            padding: 1rem 1.25rem;
+            margin: 1.5rem 0;
+        }
+
+        .start-box h2 {
+            margin-top: 0;
+            border: none;
+            padding: 0;
+        }
+
+        #start-guided {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            padding: 0.7rem 1.4rem;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        #start-guided:hover {
+            background-color: #218838;
+        }
+
+        #start-guided:disabled {
+            filter: grayscale(1);
+            cursor: default;
+        }
+
+        #start-status {
+            margin-left: 0.75rem;
+        }
+
+        .back {
+            margin-top: 3rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="guide">
+        <h1>How to Play</h1>
+        <p class="lead">Marvel Champions is a co-operative card game: you are a hero, the game
+        runs the villain, and you win or lose together.</p>
+
+        <div class="start-box">
+            <h2>Guided first game</h2>
+            <p>Starts <b>Spider-Man vs Rhino</b> from the Core Set — the game's own
+            starter matchup — with a coach that explains each part of the game the first
+            time you meet it. You can stop the hints at any point without stopping the game.</p>
+            <p>
+                <button id="start-guided" type="button">Start the guided game</button>
+                <span id="start-status"></span>
+            </p>
+        </div>
+
+        <h2>Winning and losing</h2>
+        <ul>
+            <li>You <b>win</b> when the villain is defeated. Damage it until its hit points
+            are gone; it then advances to its next stage with a fresh, larger pool of hit
+            points, until there are no stages left.</li>
+            <li>You <b>lose</b> if the main scheme fills with threat, or if your hero is
+            defeated by taking damage equal to their hit points.</li>
+        </ul>
+
+        <h2>Two forms, one hero</h2>
+        <p>Your identity card has two sides and you may flip it <b>once per turn</b>.</p>
+        <table>
+            <tr>
+                <th>Hero form</th>
+                <th>Alter-ego form</th>
+            </tr>
+            <tr>
+                <td>Attack, thwart and defend. The villain <b>attacks</b> you.</td>
+                <td>Recover damage and a larger hand size. The villain <b>schemes</b>
+                instead, adding threat to the main scheme.</td>
+            </tr>
+        </table>
+        <p>Choosing when to flip down and heal is the central decision of the game.</p>
+
+        <h2>The round</h2>
+        <ol>
+            <li><b>Player phase.</b> Each player takes a turn: play cards, use abilities, and
+            use basic powers. Your hero card <b>exhausts</b> (turns sideways) when it uses a
+            basic power, so you get one per turn.
+                <ul>
+                    <li><b>Attack</b> — deal damage equal to your ATK to an enemy.</li>
+                    <li><b>Thwart</b> — remove threat equal to your THW from a scheme.</li>
+                    <li><b>Defend</b> — offered when an enemy attacks you; reduces the damage by your DEF.</li>
+                    <li><b>Recover</b> — alter-ego only; heal damage equal to your REC.</li>
+                </ul>
+                At the end of your turn you draw back up to your hand size.
+            </li>
+            <li><b>Villain phase</b>, in four steps:
+                <ol>
+                    <li>The main scheme gains threat — its escalation value per player, plus
+                    any acceleration icons in play.</li>
+                    <li>The villain activates against each player, and every engaged minion
+                    activates against the player it is engaged with. Attacks flip a face-down
+                    <b>boost</b> card that can add to the damage.</li>
+                    <li>Each player is dealt one encounter card face down.</li>
+                    <li>Those cards are revealed and resolved.</li>
+                </ol>
+            </li>
+        </ol>
+
+        <h2>Paying for cards</h2>
+        <p>Every player card costs resources. You pay by discarding other cards from your
+        hand: each card is worth the resource icon printed in its corner. Cards, upgrades
+        and your alter-ego side can generate resources too.</p>
+
+        <h2>Controls</h2>
+        <h3>Playing a card or using a power</h3>
+        <ol>
+            <li>Click the card — in your hand, or your hero card for its basic powers.</li>
+            <li>If it offers more than one ability, pick one from the buttons that appear.</li>
+            <li>Click the legal targets, which are highlighted.</li>
+            <li>Click cards in hand to pay the cost.</li>
+            <li>Press <b>OK</b> to confirm.</li>
+        </ol>
+        <p>The <b>End</b> button on the right edge ends your turn. The sidebar tucked against
+        the right edge holds Log, Pause, Undo, Redo and QSave.</p>
+
+        <h3>Keyboard and mouse</h3>
+        <table>
+            <tr><th>Input</th><th>Action</th></tr>
+            <tr><td>Hover</td><td>Zoom the card</td></tr>
+            <tr><td>Right click or <kbd>F</kbd></td><td>Flip the card</td></tr>
+            <tr><td>Middle click, <kbd>Q</kbd>, <kbd>E</kbd> or <kbd>R</kbd></td><td>Rotate the card</td></tr>
+            <tr><td><kbd>Enter</kbd></td><td>Confirm (same as OK)</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Cancel, or skip an animation</td></tr>
+            <tr><td><kbd>Space</kbd></td><td>Pause and resume</td></tr>
+            <tr><td><kbd>Tab</kbd></td><td>Show the game log</td></tr>
+            <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></td><td>Open your deck, discard pile and additional piles</td></tr>
+            <tr><td>Hold <kbd>Ctrl</kbd></td><td>Fast-forward animations</td></tr>
+            <tr><td>Hold <kbd>Alt</kbd></td><td>Zoom the image</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo (this affects every player in a multiplayer game)</td></tr>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Quick save</td></tr>
+            <tr><td><kbd>F1</kbd> – <kbd>F4</kbd></td><td>Focus on player 1 – 4</td></tr>
+        </table>
+
+        <h2>Where to go next</h2>
+        <ul>
+            <li><a href="./scene">New Game</a> — pick any scenario, hero and modular set, or
+            turn on expert mode.</li>
+            <li><a href="./deck">Deck Editor</a> — build your own deck instead of the starter one.</li>
+            <li><a href="./cards">View Cards</a> — browse every card in the collection.</li>
+            <li><a target="_blank" href="https://itch.io/t/3763917/how-to-play-this-game">The
+            full guide on itch.io</a> — troubleshooting and the latest notes.</li>
+        </ul>
+
+        <p class="back"><a href="./main">&larr; Back to the main menu</a></p>
+    </div>
+
+    <script>
+        // Builds the same payload the New Game screen posts, with the Core Set
+        // starter matchup filled in, then opens the board with the coach enabled.
+        const TUTORIAL_SCENARIO = 'rhino'
+        const TUTORIAL_HERO = 'spider_man'
+
+        const button = document.querySelector('#start-guided')
+        const status = document.querySelector('#start-status')
+
+        async function getJson(url) {
+            const response = await fetch(url)
+            if( !response.ok ) {
+                throw new Error(`${url}: ${response.statusText}`)
+            }
+            return await response.json()
+        }
+
+        async function startGuidedGame() {
+            button.disabled = true
+            status.textContent = 'Dealing the cards...'
+            // Start the hints from the top, even if this tab has run the tutorial before.
+            try {
+                sessionStorage.removeItem('tutorial_seen_hints')
+            } catch (error) {
+            }
+            try {
+                const [scenario, hero] = await Promise.all([
+                    getJson(`get_scenario_json?${TUTORIAL_SCENARIO}`),
+                    getJson(`get_hero_json?${TUTORIAL_HERO}`),
+                ])
+
+                const new_game = {
+                    campaign_json: JSON.stringify(scenario),
+                    // The scenario names the sets it needs; the New Game screen
+                    // pre-selects exactly these two lists.
+                    encounter_set_names: scenario['encounter_sets'].concat(scenario['modular_sets']),
+                    hero_json: [JSON.stringify(hero)],
+                    seed: -1,
+                    timeout: 0,
+                    challenges: [],
+                    // The New Game screen's defaults: RRG 1.6, no variants.
+                    rules: ['v16_all'],
+                    campaign_log: {},
+                }
+
+                const response = await fetch(`new?data=${encodeURIComponent(JSON.stringify(new_game))}`)
+                if( !response.ok ) {
+                    throw new Error(`new: ${response.statusText}`)
+                }
+                status.textContent = ''
+                window.location.href = '/?p=0&tutorial'
+            } catch (error) {
+                console.error(error)
+                status.textContent = `Could not start the game (${error.message}).`
+                button.disabled = false
+            }
+        }
+
+        button.onclick = startGuidedGame
+    </script>
+</body>
+
+</html>
