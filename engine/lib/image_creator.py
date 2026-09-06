@@ -40,11 +40,23 @@ class ImageCreatorHelper:
 
     ################################################################################
     #
+    # `cour.ttf` only resolves on Windows, so fall back to the equivalent
+    # monospace faces shipped with macOS and Linux before giving up.
+    font_fallbacks = ["Menlo.ttc", "DejaVuSansMono.ttf", "Courier New.ttf", "LiberationMono-Regular.ttf"]
+
     @staticmethod
     def Initialize() -> None:
+        for font_name in [FONT.value] + ImageCreatorHelper.font_fallbacks:
+            try:
+                ImageCreatorHelper.font = ImageFont.truetype(font_name, ImageCreatorHelper.font_size)
+                return
+            except IOError:
+                continue
+
         try:
-            ImageCreatorHelper.font = ImageFont.truetype(FONT.value, ImageCreatorHelper.font_size)
-        except IOError:
+            ImageCreatorHelper.font = ImageFont.load_default(ImageCreatorHelper.font_size)
+        except TypeError:
+            # Pillow < 10.1 does not accept a size here.
             ImageCreatorHelper.font = ImageFont.load_default()
 
     @staticmethod
@@ -96,18 +108,17 @@ class ImageCreatorHelper:
     @staticmethod
     def DrawText(draw: ImageDraw.ImageDraw, text: str, position: Tuple[int, int], font: ImageFont.ImageFont|ImageFont.FreeTypeFont, max_width: int, fill: str='black', wrap: bool=False) -> None:
         lines: List[str] = []
-        filtered_text = text
-        words = filtered_text.split()
         current_line = ""
 
-        # for word in words:
-        #     # Check if adding the next word would exceed the max width
-        #     test_line = f"{current_line} {word}".strip()
-        #     if draw.textsize(test_line, font=ImageCreatorHelper.font)[0] <= max_width:
-        #         current_line = test_line
-        #     else:
-        #         lines.append(current_line)
-        #         current_line = word
+        for word in text.split():
+            # Check if adding the next word would exceed the max width.
+            # `draw.textsize` was removed in Pillow 10; `textlength` replaces it.
+            test_line = f"{current_line} {word}".strip()
+            if not current_line or draw.textlength(test_line, font=font) <= max_width:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = word
 
         # Add the last line if there's any text left
         if current_line:

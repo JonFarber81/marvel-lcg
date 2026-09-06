@@ -11,13 +11,19 @@ IMAGE_FOLDERS   = ConfigVariables.Folders('image_folders', ["./assets/pics/"])
 TEXTURE_FOLDER  = ConfigVariables.Folder('texture_folder', "./assets/textures/")
 CACHE_FOLDER    = ConfigVariables.Folder('cache_folder', "./assets/cache/")
 IMAGE_SERVERS   = ConfigVariables.ListStr('image_servers', [])
-SAVE_EMPTY_IMAGE = ConfigVariables.Bool('save_empty_image', True)
+# `save_empty_image` is gone: generated stand-ins are no longer written to disk.
 BREAK_WHEN_LOAD_ONLINE_IMAGE = ConfigVariables.Bool('break_when_load_online_image', False)
 
 class Cache:
 
     cache: Dict[str, bytes] = {}
     link_pic: Dict[str, str] = {}
+    # Ids currently served by a generated stand-in rather than real art.
+    placeholders: Set[str] = set()
+
+    @staticmethod
+    def IsPlaceholder(card_id: str) -> bool:
+        return card_id.lstrip("/") in Cache.placeholders
 
     @staticmethod
     def SetLinkPic(card_id: str, link_to_pic_id: str):
@@ -85,7 +91,6 @@ class Cache:
             with FileManager.OpenFile(file_path, write=True, bin=True) as file:
                 file.Write(data)
 
-        is_time_out = True
         if IMAGE_SERVERS.value and check_is_card_id(card_id):
             # Load the image from the internet
             skip_break = not BREAK_WHEN_LOAD_ONLINE_IMAGE.value
@@ -99,8 +104,6 @@ class Cache:
             # "https://cerebrodatastorage.blob.core.windows.net/cerebro-cards/official/${card_id}.jpg",
             # "https://marvelcdb.com/bundles/cards/${card_id}.jpg",
             # "https://marvelcdb.com/bundles/cards/${card_id}.png",
-
-            is_time_out = False
 
             for site in IMAGE_SERVERS.value:
                 full_url = site
@@ -136,14 +139,17 @@ class Cache:
                     return image_data
                 except requests.exceptions.Timeout:
                     Log.Warn(CATEGORY_NAME, f"Timeout occurred while downloading {file_name}")
-                    is_time_out = True
                 except requests.exceptions.RequestException as e:
                     Log.Warn(CATEGORY_NAME, f"Request failed with error: {e}")
 
         # raise Exception(f"Failed to load {file_name} from the internet")
+        # A stand-in is never written to the image cache. On disk it is
+        # indistinguishable from real art, so one failed download would mask the
+        # real image for good - including after the asset pack is installed or
+        # the card appears on the image server. Holding it in memory is enough to
+        # stop the same request hitting the network again this session.
         image_data = ImageCreator.CreateNoImage(card_id)
-        if SAVE_EMPTY_IMAGE.value and not is_time_out:
-            save_to_file(file_name, "jpg", image_data)
+        Cache.placeholders.add(file_name)
         Cache.SetCache(file_name, image_data)
         return image_data
 

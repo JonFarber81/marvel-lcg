@@ -20,12 +20,20 @@ class GameServerFiles(GameServerBase):
         player = request.match_info.get('player')
         return web.Response(text=f"Please visiting /?p={player}", status=404)
 
+    def ImageHeaders(self, card_id: str) -> Dict[str, str]:
+        # A generated stand-in must not be cached by the browser: the real art
+        # appears as soon as the asset pack is installed or the download
+        # succeeds, and a year-long max-age would keep the grey box on screen.
+        if Cache.IsPlaceholder(card_id):
+            return {'Cache-Control': 'no-store'}
+        return self.HeaderCache
+
     def handle_sets_image(self, request: web.Request) -> web.StreamResponse:
         file_path = request.path
 
         image_bytes = Cache.LoadImage(file_path)
 
-        return web.Response(body=image_bytes, content_type='image/jpeg', headers=self.HeaderCache)
+        return web.Response(body=image_bytes, content_type='image/jpeg', headers=self.ImageHeaders(file_path))
 
     def handle_image_request(self, request: web.Request) -> web.StreamResponse:
         # file_path = request.match_info['path']
@@ -37,7 +45,7 @@ class GameServerFiles(GameServerBase):
 
         self.device_manager.AddSize("Image", image_size)
 
-        return web.Response(body=image_bytes, content_type='image/jpeg', headers=self.HeaderCache)
+        return web.Response(body=image_bytes, content_type='image/jpeg', headers=self.ImageHeaders(file_path))
 
     @override
     def __init__(self) -> None:
