@@ -342,6 +342,44 @@ class SetInfo{
 /** @type{Object.<string, SetInfo>} */
 let sets_json = {}
 
+/** Resolved by the deferred module script below once the challenge
+ * checkboxes exist in the DOM. The Weekly Challenges tile reveals those
+ * checkboxes, so it must not assume they have been created yet.
+ * @type {Promise<void>} */
+let challenge_ui_ready
+/** @type {() => void} */
+let markChallengeUiReady
+challenge_ui_ready = new Promise(resolve => { markChallengeUiReady = resolve })
+
+/** Scenario JSON memo, so each scenario is fetched at most once.
+ * @type {Object.<string, Promise<any>>} */
+let scenario_json_cache = {}
+
+/** @param {string} name */
+function getScenarioCached(name) {
+    if( !(name in scenario_json_cache) ) {
+        scenario_json_cache[name] = getScenario(name)
+    }
+    return scenario_json_cache[name]
+}
+
+/** Encounter set JSON memo, same purpose as `scenario_json_cache`.
+ * @type {Object.<string, Promise<any>>} */
+let encounter_json_cache = {}
+
+/** @param {string} name */
+function getEncounterSetCached(name) {
+    if( !(name in encounter_json_cache) ) {
+        encounter_json_cache[name] = fetch(`get_encounter_set_json?${name}`).then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok: ' + response.statusText);
+            }
+            return response.json()
+        })
+    }
+    return encounter_json_cache[name]
+}
+
 var last_current_package = ""
 
 /** @param {string} path */
@@ -393,6 +431,25 @@ async function createScenarios() {
         }
     }
 
+    // Warm every scenario JSON in one parallel burst. Building the tiles used
+    // to await a request per button, so the page sat empty through ~160
+    // sequential round-trips; the loop below now resolves straight from memory.
+    /** @type {string[]} */
+    let prefetch_names = []
+    for( let key in sets_json ) {
+        for( let text of sets_json[key].scenarios ) {
+            prefetch_names.push(text)
+            if( key != "Weekly Challenges" && key != 'Custom' ) {
+                prefetch_names.push(`${text}_expert`)
+            }
+        }
+    }
+    await Promise.all(prefetch_names
+        .filter(name => file_names.includes(name))
+        // A failure is reported where the button is built; swallow it here so a
+        // single bad scenario cannot reject the whole batch.
+        .map(name => getScenarioCached(name).catch(() => undefined)))
+
     var select = document.querySelector("#set-images");
     for( let key in sets_json ) {
         if( sets_json[key].scenarios.length == 0 ) {
@@ -418,11 +475,17 @@ async function createScenarios() {
             summary.dataset.package = key
             if( key == "Weekly Challenges" ) {
                 summary.dataset.total = sets_json[key].scenarios.length
-                for( let text of sets_json[key].scenarios ) {
-                    if( file_names.includes(text) ) {
-                        document.getElementById(text).parentElement.style.display = ""
+                challenge_ui_ready.then(() => {
+                    for( let text of sets_json[key].scenarios ) {
+                        if( !file_names.includes(text) ) {
+                            continue
+                        }
+                        const checkbox = document.getElementById(text)
+                        if( checkbox ) {
+                            checkbox.parentElement.style.display = ""
+                        }
                     }
-                }
+                })
             }
             if( key == "Custom" ) {
                 summary.dataset.total = sets_json[key].scenarios.length
@@ -442,7 +505,7 @@ async function createScenarios() {
             }
             else {
                 let img = document.createElement("img");
-                let data = await getScenario(option.value)
+                let data = await getScenarioCached(option.value)
                 let scheme = data["villain"][0]
                 let image_name = ""
                 if( 'challenges' in data ) {
@@ -565,12 +628,8 @@ async function createSets() {
     var modular_select = document.querySelector("#modular-sets");
 
     async function createButtons(text, nemesis=false) {
-        const response = await fetch(`get_encounter_set_json?${text}`);
-        if (!response.ok) {
-            throw new Error('Network response was not ok: ' + response.statusText);
-        }
         /** @type {string[]} */
-        const j = await response.json();
+        const j = await getEncounterSetCached(text);
 
         var div = document.createElement("button");
         var img = document.createElement("img");
@@ -605,6 +664,24 @@ async function createSets() {
         }
         return div
     }
+
+    // Same one-burst prefetch as the scenario tiles: the loops below used to
+    // block on a round-trip per button, ~200 of them back to back.
+    /** @type {string[]} */
+    let prefetch_names = []
+    for( let key in sets_json ) {
+        for( let text of sets_json[key].encounters ) {
+            if( file_names.includes(text) ) {
+                prefetch_names.push(text)
+            }
+        }
+    }
+    for( let text of file_names ) {
+        if( text.endsWith("_nemesis") ) {
+            prefetch_names.push(text)
+        }
+    }
+    await Promise.all(prefetch_names.map(name => getEncounterSetCached(name).catch(() => undefined)))
 
     for( let key in sets_json ) {
         for( let text of sets_json[key].encounters ) {
@@ -950,6 +1027,8 @@ p:has(#timeout_text) {
 
             // Call the function to create the list
             createChallengeList();
+            // Let the Weekly Challenges tile reveal the labels it needs.
+            markChallengeUiReady();
 
         </script>
 
