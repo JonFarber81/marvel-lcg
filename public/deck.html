@@ -261,7 +261,7 @@ var cardPreview
 
 <fieldset style="flex-direction: column;">
     <legend>Load</legend>
-    <div>Load from marvelcdb.com: <input id="deck_id" name="deck_id" value="" placeholder="2345" required> <input type="button" onclick="getDeck(false)" value="Get Player Deck"> <input type="button" onclick="getDeck(true)" value="Get Player Deck (Private)"></div>
+    <div>Load from marvelcdb.com: <input id="deck_id" name="deck_id" value="" size="52" placeholder="https://marvelcdb.com/decklist/view/103/... or 103" required> <input type="button" onclick="getDeck()" value="Get Deck"></div>
     <div>Load from a local file: <input type="file" onchange="loadDeck(this)" accept=".json"> </div>
     <div>Load from clipboard: <input type="button" onclick="importDeck()" value="Import"> </div>
 </fieldset>
@@ -301,7 +301,7 @@ var cardPreview
         <li>Right click: Remove</li>
         <li>Middle click: Duplicate</li>
         <!-- <li>"Deadpool" and other heroes who use `set_aside` may also need to edit Extra deck.</li> -->
-        <li>Put your decks in the folder "./deck" to display them in `My Deck`</li>
+        <li>"Save to My Deck" stores the deck in the folder "./deck", which is what `My Deck` lists. You can also put deck files there yourself.</li>
         <li>We recommend you use <a href="https://marvelcdb.com/deck/new">marvelcdb.com</a> to build your deck.</li>
         <li><button onclick="ViewCards()">View Cards</button></li>
         <script>
@@ -323,7 +323,8 @@ var cardPreview
 <fieldset style="flex-direction: column;">
     <input type="button" onclick="exportDeck()" value="Export">
     <input type="button" onclick="play()" value="Play">
-    <input type="button" onclick="saveDeck()" style="background-color: skyblue;" value="Save">
+    <input type="button" onclick="saveDeck()" style="background-color: skyblue;" value="Save" title="Download this deck as a file">
+    <input type="button" onclick="saveDeckToFolder()" style="background-color: lightgreen;" value="Save to My Deck" title="Save this deck in the ./deck folder, so it shows up under `My Deck`">
 </fieldset>
 
 <script>
@@ -358,56 +359,232 @@ var hero_data = {
     "side_deck": [],
 }
 
-function getDeck(is_private) {
-    let deck_id = document.querySelector("#deck_id").value
-    if( !deck_id ) {
+const MARVELCDB_URL = "https://marvelcdb.com"
+
+/**
+ * Reads a marvelcdb deck URL, or a bare deck id, into the id and the endpoints
+ * to try for it. A published deck lives under `decklist`, a deck of your own
+ * under `deck`, and the two numbering schemes are unrelated, so the URL says
+ * which one to ask first and the other is only a fallback.
+ * @param {string} text
+ */
+function parseMarvelcdbInput(text) {
+    text = (text || "").trim()
+    if( !text ) {
+        return null
+    }
+    const url = text.match(/marvelcdb\.com\/(decklist|deck)\/[a-z_]+\/(\d+)/i)
+    if( url ) {
+        const kinds = url[1].toLowerCase() == "deck" ? ["deck", "decklist"] : ["decklist", "deck"]
+        return { id: url[2], kinds: kinds }
+    }
+    const id = text.match(/^\d+$/)
+    if( id ) {
+        return { id: id[0], kinds: ["decklist", "deck"] }
+    }
+    return null
+}
+
+/**
+ * @param {string} id
+ * @param {string[]} kinds
+ */
+async function fetchMarvelcdbDeck(id, kinds) {
+    let status = 0
+    for( const kind of kinds ) {
+        let response
+        try {
+            response = await fetch(`${MARVELCDB_URL}/api/public/${kind}/${id}.json`)
+        } catch( error ) {
+            throw new Error("Could not reach marvelcdb.com. Please check your internet connection.")
+        }
+        if( response.ok ) {
+            try {
+                return { data: await response.json(), kind: kind }
+            } catch( error ) {
+                throw new Error(`marvelcdb.com did not return a deck for the ID ${id}.`)
+            }
+        }
+        status = response.status
+    }
+    throw new Error(
+        `Failed to load the deck with ID ${id} (HTTP ${status}).\n` +
+        `Please verify that the ID or the URL is correct. Someone else's deck is only readable ` +
+        `when it is published, or when the "Share your decks" option is checked in its owner's settings.`
+    )
+}
+
+/** @param {string} name a deck file name, without folder or extension */
+async function fetchDeckByName(name) {
+    try {
+        const response = await fetch(`get_hero_json?${name}`)
+        if( !response.ok ) {
+            return null
+        }
+        return await response.json()
+    } catch( error ) {
+        return null
+    }
+}
+
+/** @type {Promise<Object<string,string>>|null} */
+var starter_deck_index = null
+
+/**
+ * Every identity code of every starter deck, mapped to its file name. Both
+ * sides are indexed, so a hero code from marvelcdb finds its deck whichever
+ * side that code names.
+ */
+function getStarterDeckIndex() {
+    if( starter_deck_index == null ) {
+        starter_deck_index = (async () => {
+            /** @type {Object<string,string>} */
+            const index = {}
+            const response = await fetch(`list_starter_deck?`)
+            if( !response.ok ) {
+                return index
+            }
+            const files = await response.json()
+            await Promise.all(files.map(async (path) => {
+                const name = path.replace(/^.*[\\/]/, '').replace(/\.[^/.]+$/, "")
+                const deck = await fetchDeckByName(name)
+                if( deck == null || !('hero' in deck) ) {
+                    return
+                }
+                for( const identity of deck['hero'] ) {
+                    for( const card_id of identity.split(",") ) {
+                        if( !(card_id in index) ) {
+                            index[card_id] = name
+                        }
+                    }
+                }
+            }))
+            return index
+        })()
+    }
+    return starter_deck_index
+}
+
+/** @param {string} hero_code */
+async function findStarterDeck(hero_code) {
+    if( !hero_code ) {
+        return null
+    }
+    const index = await getStarterDeckIndex()
+    if( !(hero_code in index) ) {
+        return null
+    }
+    return await fetchDeckByName(index[hero_code])
+}
+
+/**
+ * The card codes a deck entry stands for. A double-sided card is a single entry
+ * here ("26002a,26002b"), while marvelcdb names it by one side ("32031a") or by
+ * the bare number ("26002"), so every spelling of it has to be recognised.
+ * @param {string} entry
+ */
+function cardCodes(entry) {
+    /** @type {string[]} */
+    const codes = []
+    for( const card_id of entry.split(",") ) {
+        codes.push(card_id)
+        if( /[a-z]$/.test(card_id) ) {
+            codes.push(card_id.slice(0, -1))
+        }
+    }
+    return codes
+}
+
+/**
+ * marvelcdb only knows the hero and the cards you chose: the obligation, the
+ * nemesis set and any set-aside cards come from the hero's starter deck here.
+ * @param {Object} json_data a deck as returned by the marvelcdb API
+ * @param {string} url where that deck came from
+ */
+async function applyMarvelcdbDeck(json_data, url) {
+    const starter = await findStarterDeck(json_data['hero_code'])
+    if( starter != null ) {
+        hero_data = starter
+    } else if( hero_data['hero'].length == 0 ) {
+        alert(
+            `"${json_data['hero_name'] || json_data['hero_code']}" is not implemented in this game yet.\n` +
+            `Pick a hero above first if you want to import this deck's cards anyway.`
+        )
         return
     }
-    var ajax = new XMLHttpRequest();
-    if( is_private ) {
-        ajax.open("GET", `https://marvelcdb.com/api/public/deck/${deck_id}.json`, true);
-    } else {
-        ajax.open("GET", `https://marvelcdb.com/api/public/decklist/${deck_id}.json`, true);
+
+    if( json_data['name'] ) {
+        hero_data['name'] = json_data['name']
     }
-    document.querySelector(`#hero`).value = ''
-    ajax.onreadystatechange = async function () {
-        if( this.readyState == 4 ) {
-            if( this.status == 200 ) {
-                response = this.response
-                let json_data = JSON.parse(response)
-                // console.log(j)
+    hero_data['metadata'] = Object.assign({}, hero_data['metadata'], { url: url })
 
-                // let hero = json_data['investigator_code']
-                // let hero_name = json_data['investigator_name']
-                // await set_hero(hero_name)
-
-                hero_data['player_deck'] = []
-                for( let card_id in json_data['slots'] ) {
-
-                    // Hack
-                    if( card_id == "26002" ) {
-                        continue
-                    }
-
-                    if( card_id in cardStatistics.const_card_dict && cardStatistics.const_card_dict[card_id].class == "Hero" ) {
-                        continue
-                    }
-                    for( let x=0; x<json_data['slots'][card_id]; x++ ) {
-                        hero_data['player_deck'].push(card_id)
-                    }
-                }
-
-                showDeckCards()
-            } else {
-                if( is_private ) {
-                    alert(`Failed to load the deck with ID ${deck_id}.\nPlease verify that the ID is correct and that it is not a public deck, and that the "Share your decks" option is checked in the user's settings.`);
-                } else {
-                    alert(`Failed to load the deck with ID ${deck_id}.\nPlease verify that the ID is correct and that it is not a private deck.`);
-                }
+    // The hero's own cards are already in the starter deck at their printed
+    // quantities, and so are the cards this game sets aside for heroes that use
+    // them, so anything `slots` repeats from there is dropped rather than dealt
+    // into the deck a second time.
+    const in_hero_data = new Set()
+    for( const key of ['hero', 'hero_deck', 'set_aside', 'obligations', 'nemesis_set'] ) {
+        for( const entry of hero_data[key] || [] ) {
+            for( const card_id of cardCodes(entry) ) {
+                in_hero_data.add(card_id)
             }
         }
     }
-    ajax.send();
+
+    /** @type {string[]} */
+    const missing = []
+    hero_data['hero_deck'] = hero_data['hero_deck'] || []
+    hero_data['player_deck'] = []
+    hero_data['side_deck'] = []
+    for( const card_id in json_data['slots'] ) {
+        if( in_hero_data.has(card_id) ) {
+            continue
+        }
+        const card = cardStatistics.const_card_dict[card_id]
+        if( card == undefined ) {
+            missing.push(card_id)
+            continue
+        }
+        // A hero card that the starter deck does not carry still belongs to the
+        // hero, not to the aspect deck.
+        const deck = card.class == "Hero" ? hero_data['hero_deck'] : hero_data['player_deck']
+        for( let i = 0; i < json_data['slots'][card_id]; i++ ) {
+            deck.push(card_id)
+        }
+    }
+
+    showDeckCards()
+    document.getElementById('deck_editor').scrollIntoView({ behavior: 'smooth' })
+
+    if( missing.length != 0 ) {
+        alert(
+            `Imported "${hero_data['name']}".\n\n` +
+            `These cards are not in this game's card database yet and were skipped:\n${missing.join(", ")}`
+        )
+    }
+}
+
+async function getDeck() {
+    // `cardStatistics` is only defined once the module script has read the card
+    // database, and the import needs it to tell a hero card from an aspect one.
+    if( typeof cardStatistics == "undefined" ) {
+        alert("The card database is still loading. Please try again in a moment.")
+        return
+    }
+    const parsed = parseMarvelcdbInput(document.querySelector("#deck_id").value)
+    if( parsed == null ) {
+        alert("Please paste a marvelcdb.com deck URL, or the deck's ID.")
+        return
+    }
+    document.querySelector(`#hero`).value = ''
+    let deck
+    try {
+        deck = await fetchMarvelcdbDeck(parsed.id, parsed.kinds)
+    } catch( error ) {
+        alert(error.message)
+        return
+    }
+    await applyMarvelcdbDeck(deck.data, `${MARVELCDB_URL}/${deck.kind}/view/${parsed.id}`)
 }
 
 /** @param {string} card_id */
@@ -593,6 +770,51 @@ async function importDeck() {
     if( text ) {
         hero_data = JSON.parse(text)
         showDeckCards()
+    }
+}
+
+/**
+ * @param {string} name
+ * @param {boolean} overwrite
+ */
+async function postDeck(name, overwrite) {
+    return await fetch('save_deck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, overwrite: overwrite, deck: hero_data }),
+    })
+}
+
+async function saveDeckToFolder() {
+    if( hero_data == undefined || hero_data['hero'].length == 0 ) {
+        alert("Please pick a hero first")
+        return
+    }
+    updatePlayerDeck()
+
+    const name = prompt("Save this deck in the deck folder as:", hero_data['name'] || "")
+    if( !name ) {
+        return
+    }
+    hero_data['name'] = name
+
+    let response = await postDeck(name, false)
+    if( response.status == 409 ) {
+        if( !confirm(`"${name}" already exists in the deck folder. Replace it?`) ) {
+            return
+        }
+        response = await postDeck(name, true)
+    }
+
+    let result = {}
+    try {
+        result = await response.json()
+    } catch( error ) {
+    }
+    if( response.ok ) {
+        alert(`Saved to ${result['path']}\nReload this page to find it under "My Deck".`)
+    } else {
+        alert(`Could not save the deck: ${result['error'] || response.statusText}`)
     }
 }
 

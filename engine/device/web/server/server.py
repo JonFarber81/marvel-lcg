@@ -1,12 +1,13 @@
 from engine.device.web.server.server_files import GameServerFiles
 from engine.device.web.server.server_html import GameServerHTML
 from engine.device.web.server.server_get import GameServerGet
+from engine.device.web.server.server_deck import GameServerDeck
 from engine.device.web.server.server_new_game import GameServerNewGame
 from engine.device.web.server.server_socket import GameServerSocket
 from engine.device.web.server.server_sync import GameServerSync
 from engine.device.manager.web.manager import WebDeviceManager
 
-class GameServer(GameServerFiles, GameServerHTML, GameServerGet, GameServerNewGame, GameServerSocket, GameServerSync):
+class GameServer(GameServerFiles, GameServerHTML, GameServerGet, GameServerDeck, GameServerNewGame, GameServerSocket, GameServerSync):
 
     def __init__(self, manager: 'WebDeviceManager') -> None:
         self.SetManager(manager)
