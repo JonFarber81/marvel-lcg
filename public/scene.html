@@ -162,6 +162,19 @@
         content: "";
     }
 
+    /* The legend carries the whole selection, so cap it at one line and let
+       the title attribute hold the rest. */
+    #modular-summary {
+        font-weight: normal;
+        opacity: .75;
+        display: inline-block;
+        max-width: 60ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        vertical-align: bottom;
+    }
+
     /* button:hover,
     img:hover {
         filter: none !important;
@@ -956,7 +969,7 @@ async function createScenarios() {
 </fieldset>
 
 <fieldset style="flex-direction: column; position: relative;">
-    <legend>Modular Sets</legend>
+    <legend>Modular Sets <span id="modular-summary">(none selected)</span></legend>
     <div>
         <button onclick="document.querySelector(`#modular-sets`).classList.toggle('hide-not-click')">Expand</button>
         <button onclick="random_modular()">Random</button>
@@ -974,6 +987,58 @@ async function createScenarios() {
 </fieldset>
 
 <script>
+
+/** The modular set buttons are the only record of what is chosen: a set is
+ * selected when its button carries the `click` class. Four places toggle that
+ * class - the button's own handler, "Random", the scenario's defaults in
+ * SetScenario, and the saved form - so the legend summary is driven off a
+ * MutationObserver instead of a call at each of them. */
+const ModularSummary = {
+
+    /** Names past this many are counted rather than listed. */
+    MAX_NAMES: 4,
+
+    /** @param {HTMLElement} button */
+    Label(button) {
+        return button.dataset.label || button.dataset.name || ''
+    },
+
+    Update() {
+        const summary = document.querySelector('#modular-summary')
+        if( !summary ) {
+            return
+        }
+        const names = [...document.querySelectorAll('#modular-sets button.click')]
+            .map(ModularSummary.Label)
+            .sort((a, b) => a.localeCompare(b))
+
+        if( names.length == 0 ) {
+            summary.textContent = '(none selected)'
+            summary.title = 'Expand to choose the modular sets this game is played with.'
+            return
+        }
+        const shown = names.slice(0, ModularSummary.MAX_NAMES)
+        const rest = names.length - shown.length
+        summary.textContent = `(${names.length}) ${shown.join(', ')}` +
+            (rest > 0 ? ` and ${rest} more` : '')
+        summary.title = names.join('\n')
+    },
+
+    Watch() {
+        const sets = document.querySelector('#modular-sets')
+        if( !sets ) {
+            return
+        }
+        new MutationObserver(ModularSummary.Update).observe(sets, {
+            subtree: true,
+            childList: true,
+            attributes: true,
+            attributeFilter: ['class'],
+        })
+        ModularSummary.Update()
+    },
+}
+ModularSummary.Watch()
 
 async function createSets() {
     LoadProgress.Phase("Loading the encounter set list...")
@@ -1003,6 +1068,7 @@ async function createSets() {
         div.setAttribute('data-text', j['encounters'].length)
         div.setAttribute('data-name', text)
         div.setAttribute('data-display', `${j['encounters'][0]} ${text}`)
+        div.setAttribute('data-label', j['name'] || text)
         div.appendChild(img)
         div.onclick = () => {
             div.classList.toggle('click')
