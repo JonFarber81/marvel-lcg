@@ -142,10 +142,46 @@
         .wild-mode {
             background: rgb(161, 129, 0);
         }
+
+        /* Shown only when the downloaded art pack is missing. Nothing else on
+           the page says so: the game runs, it just draws every card itself. */
+        #assets-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10000;
+            display: none;
+            padding: .6rem 1rem;
+            background-color: #3a2e14;
+            border-bottom: 1px solid #d8a53a;
+            color: #ffe3a8;
+            text-align: left;
+            line-height: 1.5;
+        }
+
+        #assets-banner.show {
+            display: block;
+        }
+
+        #assets-banner a {
+            color: #ffd166;
+        }
+
+        #assets-banner code {
+            color: #fff2d0;
+        }
+
+        body.has-assets-banner {
+            padding-top: 6rem;
+        }
     </style>
 </head>
 
 <body>
+
+    <div id="assets-banner" role="alert"></div>
+
     <div class="menu">
         <h1>Marvel Champions</h1>
         <h2>Digital Edition</h2>
@@ -218,6 +254,38 @@
             const version = getCookie('app_version')
             const versionElement = document.querySelector(`#version`);
             versionElement.innerHTML = `v${version}`;
+        })()
+    </script>
+
+    <script>
+        /** The art pack is downloaded separately (install guide step 6), and a
+         * checkout without it still starts and still plays - every card is just
+         * drawn as a grey stand-in, with nothing on screen to say why. The
+         * server checked for it once at start-up; this reports that answer. */
+        (async () => {
+            const banner = document.getElementById('assets-banner')
+            let status
+            try {
+                const response = await fetch('get_assets_status')
+                if( !response.ok ) {
+                    return
+                }
+                status = await response.json()
+            } catch( err ) {
+                // An older server has no such route, and a menu that cannot
+                // reach one has bigger problems than missing art.
+                return
+            }
+            if( !status || !status.missing ) {
+                return
+            }
+            banner.innerHTML = `Card art is missing - <code>${status.folder}</code> is not there, `
+                + `so every card is drawn as a placeholder. `
+                + `Download the game from <a href="${status.url}" target="_blank" rel="noopener">itch.io</a> `
+                + `and put its <code>assets</code> folder in the project root `
+                + `(install guide step 6), then restart.`
+            banner.classList.add('show')
+            document.body.classList.add('has-assets-banner')
         })()
     </script>
 
