@@ -14,6 +14,8 @@ CARDS_JSON_FILE         = ConfigVariables.File('cards_json_file', './data/cards.
 CARDS_JSON_CUSTOM_FILE  = ConfigVariables.File('cards_json_custom_file', '')
 CARDS_JSON_CUSTOM_FILES = ConfigVariables.Files('cards_json_custom_files', [])
 
+SETS_INFO_JSON_FILE = "./data/sets_info.json"
+
 class CardsDB:
     ability_link_cards: Dict[str, str] = {}
     full_link_cards: Dict[str, str] = {}
@@ -31,12 +33,27 @@ class CardsDB:
     checksum_ok: bool = True
 
     @staticmethod
-    def Initialize() -> None:
+    def CustomFiles() -> List[str]:
         cards_custom_file = [CARDS_JSON_CUSTOM_FILE.value] if CARDS_JSON_CUSTOM_FILE.value else []
-        CardsDB.cards_custom_files = CARDS_JSON_CUSTOM_FILES.value + cards_custom_file
+        return CARDS_JSON_CUSTOM_FILES.value + cards_custom_file
+
+    @staticmethod
+    def Rehash() -> None:
+        """Write the checksums of the card data back, for `py main.py -rehash`.
+
+        These are the files a start-up warns about: editing one is expected, but
+        the checksum it carries is then stale until it is written again.
+        """
+        for file_name in [SETS_INFO_JSON_FILE, CARDS_JSON_FILE.value] + CardsDB.CustomFiles():
+            if file_name:
+                Json.Rehash(file_name)
+
+    @staticmethod
+    def Initialize() -> None:
+        CardsDB.cards_custom_files = CardsDB.CustomFiles()
         CardsDB.cards_json_file = CARDS_JSON_FILE.value
 
-        _, checksum_ok = Json.LoadInternal("./data/sets_info.json")
+        _, checksum_ok = Json.LoadInternal(SETS_INFO_JSON_FILE)
         CardsDB.checksum_ok &= checksum_ok == "Ok"
 
         def add_set(paper: 'Paper'):
