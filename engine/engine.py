@@ -19,6 +19,7 @@ CHECK_FOR_NEW_VERSION_ON_STARTUP    = ConfigVariables.Bool('check_for_new_versio
 PRINT_MY_USER_FINGERPRINT           = ConfigVariables.Bool('print_my_user_fingerprint', False)
 
 DEVICE              = ConfigVariables.Str('device', "web")
+REHASH              = ConfigVariables.Bool('rehash', False)
 
 PROFILE_FOLDER      = ConfigVariables.Folder('profile_folder')
 TEST_ALL            = ConfigVariables.Bool('test_all', False)
@@ -48,6 +49,13 @@ class Engine:
             Log.Info(CATEGORY_NAME, game_name)
 
             ConfigVariables.Initialize()
+
+            if REHASH.value:
+                # Nothing is running yet: write the card data's checksums back and stop,
+                # so an edited data file stops warning on every start.
+                from cards.database import CardsDB
+                CardsDB.Rehash()
+                return False
 
             JobManager.Initialize()
             TaskManager.Initialize()

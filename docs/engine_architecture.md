@@ -335,6 +335,10 @@ Json.Save(data, "file.json")
 # Load with checksum verification
 data = Json.Load("file.json", check_sum="Warn")
 
+# Write a hand-edited data file's checksum back, keeping the file's own
+# formatting (`py main.py -rehash` does this for the card data)
+Json.Rehash("data/sets_info.json")
+
 # Supports comments and trailing commas in JSON
 # Supports gzip compression
 ```

@@ -9,10 +9,15 @@ CATEGORY_NAME = "JSON"
 class Json:
 
     CHECKSUM_RESULT = Literal["Ok", "Mismatch", "Version Error", "Not Found"]
+    REHASH_RESULT = Literal["Matched", "Updated", "Added", "Skipped"]
     CHECKSUM_TYPE = Literal["Ignore", "Warn", "Restrict"]
 
     CHECK_SUM_KEY = 'checksum'
     VERSION_KEY = 'version'
+
+    # The reason for a checksum warning is the same for every file, and a start-up
+    # reads several of them, so the explanation is printed once per run.
+    checksum_explained = False
 
     ################################################################################
     #
@@ -133,6 +138,66 @@ class Json:
             file.Write(data)
 
     @staticmethod
+    def ChecksumHelp() -> str:
+        """What a checksum is for, said once per run, appended to the first warning."""
+        if Json.checksum_explained:
+            return ""
+        Json.checksum_explained = True
+        return ("\nA checksum records what a file held when the game wrote it, so a data file"
+                "\nthat has been edited since says so instead of quietly changing every game"
+                "\nbuilt from it - a saved game, a replay or a bug report is then known to have"
+                "\nbeen made against data this build did not ship. Nothing is blocked by it:"
+                "\nthe file is loaded either way, and editing the data is a supported thing to do."
+                "\nRun `py main.py -rehash` to write the checksums of the card data back.")
+
+    @staticmethod
+    def Rehash(filename: str) -> REHASH_RESULT:
+        """Write `filename`'s own checksum back, after the file was edited by hand.
+
+        Only the checksum value is touched. Going through `Json.Save` would reflow
+        the whole file - `sets_info.json` is hand-formatted and comes back a third
+        bigger - so the new hash is patched into the text the file already has.
+        """
+        from engine.file import FileManager
+        from engine.log import Log
+
+        with FileManager.OpenFile(filename, read=True) as file:
+            text = file.Read()
+
+        obj = Json.Loads(text)
+        if isinstance(obj, list):
+            Log.Warn(CATEGORY_NAME, f"No {Json.CHECK_SUM_KEY} to write in file {filename}: it holds a list")
+            return "Skipped"
+
+        original_checksum = obj.pop(Json.CHECK_SUM_KEY, None)
+        checksum = Types.DictChecksum(obj)
+
+        if original_checksum == checksum:
+            Log.Info(CATEGORY_NAME, f"Checksum already matches in file {filename}")
+            return "Matched"
+
+        if original_checksum is not None:
+            head, key, tail = text.rpartition(f'"{original_checksum}"')
+            assert key, f"{Json.CHECK_SUM_KEY} of file {filename} not found in its own text"
+            text = f'{head}"{checksum}"{tail}'
+            result: 'Json.REHASH_RESULT' = "Updated"
+        else:
+            body = text.rstrip()
+            if not body.endswith("}"):
+                Log.Warn(CATEGORY_NAME, f"No {Json.CHECK_SUM_KEY} to write in file {filename}: it does not end in an object")
+                return "Skipped"
+            body = body[:-1].rstrip()
+            comma = "" if body.endswith("{") else ","
+            text = f'{body}{comma}\n    "{Json.CHECK_SUM_KEY}": "{checksum}"\n}}'
+            result = "Added"
+
+        with FileManager.OpenFile(filename, write=True) as file:
+            file.Write(text)
+
+        Log.Info(CATEGORY_NAME, f"Checksum {result.lower()} in file {filename}: {checksum}")
+        return result
+
+    @staticmethod
     def LoadInternal(filename: str) -> Tuple[Dict[Any, Any], CHECKSUM_RESULT]:
         from engine.file import FileManager
         with FileManager.OpenFile(filename, read=True) as file:
@@ -160,12 +225,10 @@ class Json:
                 #     Log.Warn(CATEGORY_NAME, text)
             elif original_checksum != recalculated_checksum:
                 checksum = "Mismatch"
+                text = f"Checksum mismatch in file {filename}"
                 if not Build.release:
-                    text = f"Checksum mismatch in file {filename}\n{recalculated_checksum}"
-                    Log.Warn(CATEGORY_NAME, text)
-                else:
-                    text = f"Checksum mismatch in file {filename}"
-                    Log.Warn(CATEGORY_NAME, text)
+                    text += f"\nCalculated {recalculated_checksum}"
+                Log.Warn(CATEGORY_NAME, text + Json.ChecksumHelp())
             else:
                 checksum = "Ok"
                 # if not Build.release:
