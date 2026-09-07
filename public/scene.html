@@ -847,8 +847,24 @@ async function createScenarios() {
     
             const details = document.createElement("div");
             summary.appendChild(details)
+            // The art is the only thing naming the set, and the corner badge
+            // used to be the whole label: "1. Core Set" rendered as "1". Keep
+            // the number there - it is what the tiles are ordered by - and
+            // spell the set out under the art, with the full name on hover for
+            // the few that are wider than the tile.
             const match = key.match(/^([\w\d]+)\./);
-            summary.setAttribute('data-title', match ? match[1] : key);
+            if( match ) {
+                summary.setAttribute('data-title', match[1]);
+            }
+            summary.title = key
+            const caption = document.createElement("span");
+            caption.classList.add("set-name")
+            // The click handler reads `.details` off the event target, so the
+            // caption must not be one: it is transparent to the pointer, like
+            // the art above it.
+            caption.style.pointerEvents = "none"
+            caption.textContent = key
+            summary.appendChild(caption)
             details.classList.add("details")
             details.style.display = "none"
             summary.dataset.package = key

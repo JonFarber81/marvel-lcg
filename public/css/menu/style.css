@@ -32,6 +32,13 @@ input[type="button"] {
 #set-images {
     display: flex;
     flex-wrap: wrap;
+
+    /* Room under each tile's art for the set name. Two lines hold every name
+       that ships ("11. The Once and Future Kang" is the longest); anything
+       longer is clipped and the tile's title= carries it in full. */
+    --set-caption--font-size: .65rem;
+    --set-caption--lines: 2;
+    --set-caption--height: calc(var(--set-caption--lines) * 1.2 * var(--set-caption--font-size));
 }
 
 #set-images div.disable {
@@ -41,7 +48,7 @@ input[type="button"] {
 
 #set-images div {
     width: calc(var(--card--height) + 10px);
-    height: calc(var(--card--height) + 10px);
+    height: calc(var(--card--height) + 10px + var(--set-caption--height));
     display: flex;
     justify-content: center;
     align-content: center;
@@ -63,12 +70,30 @@ input[type="button"] {
     left: 10px;
     background-color: rgba(0, 0, 0, .5);
 }
+/* "Weekly Challenges" and "Custom" have no leading number; the caption is the
+   whole label for them, so there is no badge to draw. */
+#set-images div:not([data-title])::before {
+    content: none;
+}
 #set-images div::after {
     content: attr(data-text);
     position: absolute;
-    bottom: 10px;
+    bottom: calc(10px + var(--set-caption--height));
     right: 10px;
     background-color: darkgoldenrod;
+}
+
+#set-images .set-name {
+    width: 100%;
+    height: var(--set-caption--height);
+    padding: 0 2px;
+    font-size: var(--set-caption--font-size);
+    line-height: 1.2;
+    text-align: center;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--set-caption--lines);
 }
 
 #set-images div.full::after {
