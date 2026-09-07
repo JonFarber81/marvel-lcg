@@ -158,6 +158,7 @@ exists to catch. Never re-record just to get a green run.
 | Entry | What it covers |
 | --- | --- |
 | `unit_test/test_scripted.py` | the scripted cases described here |
+| `unit_test/test_image_cache.py` | the image cache: its memory budget, which images get decoded, and what each is called on the wire - it builds its own pictures, so it needs no `assets/` and no network, and CI runs it beside the cases |
 | `unit_test/test_all.py` | replays the games saved under `./replays/`, the same way, for whatever you have recorded locally |
 | `unit_test/test_task.py` | build chores (version bump, card zip), not tests of the rules |
 | `puzzle/test/` | hand-built board states for the puzzle mode |

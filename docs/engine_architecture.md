@@ -381,12 +381,14 @@ text = TransText("key", param=value)  # With formatting
 
 ### Image Cache (`engine/file/cache.py`)
 
-`Cache.LoadImage` is the blocking loader: memory, then the image folders, then
-the disk cache, then the card servers, then a generated stand-in. Request
-handlers do not call it directly - they await `Cache.LoadImageAsync`, which
+`Cache.LoadImageData` is the blocking loader: memory, then the stand-ins made
+this session, then the image folders, then the disk cache, then the card
+servers, then a new stand-in. It answers a `CachedImage` - the bytes plus what
+to call them on the wire. Request handlers do not call it directly; they await
+`Cache.LoadImageAsync`, which
 
-- answers from memory with no thread hop, which is every image after its first
-  serve;
+- answers from memory with no thread hop, which is every image asked for twice
+  inside the cache budget;
 - otherwise runs the load on `Cache.Pool()`, a `ThreadPoolExecutor` of
   `image_workers` threads, made on first use and dropped by `Cache.Shutdown()`;
 - keeps one in-flight load per card id (`Cache.pending`), so the several places
@@ -395,6 +397,32 @@ handlers do not call it directly - they await `Cache.LoadImageAsync`, which
 The pool is separate from the executor behind `TaskManager.ToThread` on purpose:
 a cold New Game screen is ~160 tiles, each up to a 3s request per image server,
 and on the shared executor those fill every thread the rest of the server needs.
+
+**What is held in memory.** `Cache.memory` is an `ImageMemory`: an `OrderedDict`
+under a budget in bytes (`image_cache_mb`, 64 by default; 0 means unlimited).
+Serving an image is a touch, so what falls out first is what nothing has looked
+at for longest. It used to be a plain dict, which kept every image the process
+had ever served - 399 MB resident after one server was asked for all 953 cards
+in `assets/cache`, against 128 MB now. Stand-ins (`Cache.placeholders`) are held
+outside the budget: a stand-in means no server had the card, and evicting one
+would put that question back on the network.
+
+**What is decoded.** `ImageLib.RotateIfNeeded` reads the size and the EXIF
+orientation from the image header - `Image.open` parses that and stops - and
+returns the bytes untouched when the picture is already portrait, which is nine
+in ten. Only a landscape image is opened for real, and its rotation is written
+to `assets/cache/rotated/{id}.jpg` so later runs read it back instead of
+decoding again; a rotation older than the file it came from is ignored, which is
+what happens when art is re-downloaded or replaced by hand.
+
+**What goes out.** An image is served in the format it is stored in, with the
+content type sniffed from its bytes (`ImageLib.ContentTypeOf`), so a `.webp` set
+tile is sent as `image/webp` rather than being called a JPEG. A generated
+stand-in is additionally sent `no-store`, so the real art appears as soon as it
+exists (see §2.1 of `improvements.md`).
+
+`unit_test/test_image_cache.py` pins all three, without an `assets/` folder or a
+network.
 
 ### Image Creator (`engine/lib/image_creator.py`)
 
@@ -791,6 +819,7 @@ Create `launch.json` in the project root:
 | `auto_save` | `true` | Save the game at the end of every villain phase |
 | `auto_save_file` | `"./saves/autosave.json"` | The slot the main menu's Continue reads |
 | `image_workers` | `8` | Image loads in flight while the game is running |
+| `image_cache_mb` | `64` | Ceiling on the images held in memory; `0` is unlimited |
 
 ---
 

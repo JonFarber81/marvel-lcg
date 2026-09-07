@@ -33,24 +33,29 @@ class GameServerFiles(GameServerBase):
     # goes to the image pool when it has to read a file or ask a card server, so
     # a cold cache no longer occupies the executor the rest of the server shares.
 
+    # The image is served in the format it is stored in - a set tile is a `.webp`
+    # and stays one - so the content type comes from the cache entry. Both routes
+    # used to answer `image/jpeg` whatever they were actually sending.
+
     async def handle_sets_image(self, request: web.Request) -> web.StreamResponse:
         file_path = request.path
 
-        image_bytes = await Cache.LoadImageAsync(file_path)
+        image = await Cache.LoadImageAsync(file_path)
 
-        return web.Response(body=image_bytes, content_type='image/jpeg', headers=self.ImageHeaders(file_path))
+        return web.Response(body=image.data, content_type=image.content_type,
+                            headers=self.ImageHeaders(file_path))
 
     async def handle_image_request(self, request: web.Request) -> web.StreamResponse:
         # file_path = request.match_info['path']
         file_path = request.path
         file_path = file_path.split("/")[-1]
 
-        image_bytes = await Cache.LoadImageAsync(file_path)
-        image_size = len(image_bytes)
+        image = await Cache.LoadImageAsync(file_path)
 
-        self.device_manager.AddSize("Image", image_size)
+        self.device_manager.AddSize("Image", len(image.data))
 
-        return web.Response(body=image_bytes, content_type='image/jpeg', headers=self.ImageHeaders(file_path))
+        return web.Response(body=image.data, content_type=image.content_type,
+                            headers=self.ImageHeaders(file_path))
 
     @override
     def __init__(self) -> None:
