@@ -3,6 +3,7 @@ import { ClassName } from './class_name.js'
 import { Message } from './message.js'
 import { Cards } from './cards.js';
 import { HoverCard } from './hover.js';
+import { Viewport } from './viewport.js';
 
 
 // Define the structure for the statistics data
@@ -173,6 +174,9 @@ export class Game {
     static setGameOver(game_over: boolean) {
         if( Game.game_over != game_over ) {
             Game.game_over = game_over
+            // The game-over report is a statistics table, and there is no board
+            // left to drag, so let it be zoomed like any other page of text.
+            Viewport.setZoomAllowed('game-over', Game.game_over)
             if( Game.game_over ) {
                 document.body.classList.add(ClassName.game_over)
                 console.log('Game over')

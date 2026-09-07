@@ -1,0 +1,30 @@
+{
+    "comment": "Rhino vs a Spider-Man who never acts: setup, the villain phase end to end, and losing to the scheme clock.",
+    "scenario": "rhino",
+    "heroes": [
+        "spider_man"
+    ],
+    "seed": 12345,
+    "rules": [
+        "v16_all",
+        "no_crisis_of_infinite_deadpools",
+        "no_encounter_cards_ignore_crisis"
+    ],
+    "policy": "pass",
+    "max_prompts": 20000,
+    "expect": {
+        "result": "The Main Scheme was Completed",
+        "players_won": false,
+        "rounds": 3,
+        "inputs": 7,
+        "schemes": [
+            "01097b threat 8/7"
+        ],
+        "villains": [
+            "01094 hp 14"
+        ],
+        "players": [
+            "Spider-Man 01001b alter_ego hp 10 hand 6 deck 34 discard 0"
+        ]
+    }
+}

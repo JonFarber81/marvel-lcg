@@ -1,0 +1,31 @@
+{
+    "comment": "Two heroes against Rhino, both thwarting: player order, per-player encounter cards, and threat placed for each player.",
+    "scenario": "rhino",
+    "heroes": [
+        "spider_man",
+        "she_hulk"
+    ],
+    "seed": 777,
+    "rules": [
+        "v16_all",
+        "no_crisis_of_infinite_deadpools",
+        "no_encounter_cards_ignore_crisis"
+    ],
+    "policy": "thwart",
+    "max_prompts": 20000,
+    "expect": {
+        "result": "The Main Scheme was Completed",
+        "players_won": false,
+        "rounds": 4,
+        "inputs": 40,
+        "schemes": [
+            "01097b threat 14/14"
+        ],
+        "villains": [
+            "01094 hp 28"
+        ],
+        "players": [
+            "Spider-Man 01001b alter_ego hp 2 hand 6 deck 32 discard 2"
+        ]
+    }
+}

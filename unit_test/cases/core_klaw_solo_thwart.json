@@ -1,0 +1,30 @@
+{
+    "comment": "Klaw vs Captain Marvel, thwarting: a second scenario's villain abilities and encounter set.",
+    "scenario": "klaw",
+    "heroes": [
+        "captain_marvel"
+    ],
+    "seed": 2024,
+    "rules": [
+        "v16_all",
+        "no_crisis_of_infinite_deadpools",
+        "no_encounter_cards_ignore_crisis"
+    ],
+    "policy": "thwart",
+    "max_prompts": 20000,
+    "expect": {
+        "result": "All players were eliminated",
+        "players_won": false,
+        "rounds": 3,
+        "inputs": 20,
+        "schemes": [
+            "01117b threat 3/8"
+        ],
+        "villains": [
+            "01113 hp 12"
+        ],
+        "players": [
+            "Captain Marvel 01010a hero hp -2 hand 5 deck 32 discard 3 eliminated"
+        ]
+    }
+}

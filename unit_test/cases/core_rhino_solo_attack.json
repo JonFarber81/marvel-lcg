@@ -1,0 +1,30 @@
+{
+    "comment": "Rhino vs a Spider-Man who flips to hero form and attacks every turn: damage, exhaustion, and being defeated by the villain.",
+    "scenario": "rhino",
+    "heroes": [
+        "spider_man"
+    ],
+    "seed": 12345,
+    "rules": [
+        "v16_all",
+        "no_crisis_of_infinite_deadpools",
+        "no_encounter_cards_ignore_crisis"
+    ],
+    "policy": "attack",
+    "max_prompts": 20000,
+    "expect": {
+        "result": "All players were eliminated",
+        "players_won": false,
+        "rounds": 3,
+        "inputs": 19,
+        "schemes": [
+            "01097b threat 5/7"
+        ],
+        "villains": [
+            "01094 hp 14"
+        ],
+        "players": [
+            "Spider-Man 01001a hero hp 0 hand 5 deck 33 discard 2 eliminated"
+        ]
+    }
+}

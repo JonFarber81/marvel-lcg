@@ -10,15 +10,13 @@ The open-source of Marvel LCG digital version on [ITCH](https://irefrixs.itch.io
 | [Card Scripting Guide](docs/card_scripting_guide.md)           | How to write card ability scripts |
 | [Engine Architecture](docs/engine_architecture.md)             | Engine internals for developers   |
 | [Debug Guide](docs/debug_guide.md)                             | How to debug the game             |
+| [Testing Guide](docs/testing_guide.md)                         | Scripted rules regression cases   |
 | [Editor Guide](docs/editor_guide.md)                           | How to use the card editor        |
 
 ## Security Warning
 
 This game runs Python card scripts, which is not safe.  
 Do not install or run any third-party card scripts unless you trust them.
-
-这个游戏会运行用 Python 编写的卡牌脚本，这不安全。  
-除非你完全信任，否则不要安装或运行任何第三方的卡牌脚本。
 
 ## Snapshot
 

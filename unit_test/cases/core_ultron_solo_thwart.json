@@ -1,0 +1,30 @@
+{
+    "comment": "Ultron vs Iron Man, thwarting: the drone minions that arrive every villain phase.",
+    "scenario": "ultron",
+    "heroes": [
+        "iron_man"
+    ],
+    "seed": 99,
+    "rules": [
+        "v16_all",
+        "no_crisis_of_infinite_deadpools",
+        "no_encounter_cards_ignore_crisis"
+    ],
+    "policy": "thwart",
+    "max_prompts": 20000,
+    "expect": {
+        "result": "All players were eliminated",
+        "players_won": false,
+        "rounds": 3,
+        "inputs": 22,
+        "schemes": [
+            "01139b threat 1/5"
+        ],
+        "villains": [
+            "01134 hp 17"
+        ],
+        "players": [
+            "Iron Man 01029a hero hp 0 hand 1 deck 26 discard 10 eliminated"
+        ]
+    }
+}

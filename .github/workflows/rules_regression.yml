@@ -1,0 +1,58 @@
+# Replays the scripted regression cases in `unit_test/cases/`.
+#
+# Every card script, rule and engine change runs them: each case is a fixed seed
+# and input list, and it fails if the board diverges from the CRC recorded with
+# each input, or if the game no longer ends where it did. No `assets/` folder is
+# needed - nothing here draws anything.
+name: Rules regression
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'cards/**'
+      - 'core/**'
+      - 'data/**'
+      - 'deck/**'
+      - 'engine/**'
+      - 'game/**'
+      - 'unit_test/**'
+      - 'build.py'
+      - 'launch.json'
+      - 'requirements.txt'
+      - '.github/workflows/rules_regression.yml'
+  pull_request:
+    paths:
+      - 'cards/**'
+      - 'core/**'
+      - 'data/**'
+      - 'deck/**'
+      - 'engine/**'
+      - 'game/**'
+      - 'unit_test/**'
+      - 'build.py'
+      - 'launch.json'
+      - 'requirements.txt'
+      - '.github/workflows/rules_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  scripted-cases:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The two versions the install guide is tested against.
+        python-version: ['3.10', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Replay the scripted cases
+        run: python -m unittest unit_test.test_scripted -v

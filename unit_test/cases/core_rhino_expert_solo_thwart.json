@@ -1,0 +1,30 @@
+{
+    "comment": "Rhino on expert, thwarting: the expert encounter set and the harder villain deck.",
+    "scenario": "rhino_expert",
+    "heroes": [
+        "spider_man"
+    ],
+    "seed": 555,
+    "rules": [
+        "v16_all",
+        "no_crisis_of_infinite_deadpools",
+        "no_encounter_cards_ignore_crisis"
+    ],
+    "policy": "thwart",
+    "max_prompts": 20000,
+    "expect": {
+        "result": "The Main Scheme was Completed",
+        "players_won": false,
+        "rounds": 3,
+        "inputs": 20,
+        "schemes": [
+            "01097b threat 7/7"
+        ],
+        "villains": [
+            "01095 hp 15"
+        ],
+        "players": [
+            "Spider-Man 01001a hero hp 2 hand 5 deck 33 discard 2"
+        ]
+    }
+}

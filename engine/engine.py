@@ -96,6 +96,9 @@ class Engine:
             if DEVICE.value == "web":
                 from engine.device.manager.web.manager import WebDeviceManager
                 device = WebDeviceManager
+            elif DEVICE.value == "scripted":
+                from engine.device.manager.scripted.manager import ScriptedDeviceManager
+                device = ScriptedDeviceManager
             else:
                 from engine.device.manager.key.manager import KeyDeviceManager
                 device = KeyDeviceManager

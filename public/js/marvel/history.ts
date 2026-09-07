@@ -1,3 +1,5 @@
+import { Viewport } from './viewport.js'
+
 export class HistoryLog
 {
     static history_div? = document.getElementById("history") as HTMLElement;
@@ -29,6 +31,8 @@ export class HistoryLog
     }
     static toggle() {
         HistoryLog.history_div?.classList.toggle('hide')
+        // The menu holds the log and the setting buttons: readable text, not a board.
+        Viewport.setZoomAllowed('menu', HistoryLog.isOpen())
     }
     static addText(id: number, text: string) {
         if( id == HistoryLog.last_id ) {

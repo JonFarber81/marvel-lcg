@@ -4,6 +4,10 @@
 
 This guide teaches you how to write card ability scripts for Marvel LCG.
 
+Once you have written one, run the scripted regression cases before you commit -
+they catch the case where a change to your card changed someone else's. See the
+[Testing Guide](testing_guide.md).
+
 ## Security Warning
 
 Card scripts are **executable Python code**. Do not install or run third-party card scripts unless you trust them.

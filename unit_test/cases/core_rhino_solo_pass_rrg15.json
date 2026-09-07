@@ -1,0 +1,26 @@
+{
+    "comment": "The same Rhino game with no rule toggles set, so the pre-RRG-1.6 path stays covered too.",
+    "scenario": "rhino",
+    "heroes": [
+        "spider_man"
+    ],
+    "seed": 12345,
+    "rules": [],
+    "policy": "pass",
+    "max_prompts": 20000,
+    "expect": {
+        "result": "The Main Scheme was Completed",
+        "players_won": false,
+        "rounds": 3,
+        "inputs": 7,
+        "schemes": [
+            "01097b threat 8/7"
+        ],
+        "villains": [
+            "01094 hp 14"
+        ],
+        "players": [
+            "Spider-Man 01001b alter_ego hp 10 hand 6 deck 34 discard 0"
+        ]
+    }
+}
