@@ -60,7 +60,7 @@ class WebServer:
             if not self.IsAuthenticate(request):
                 return self.LoadHtmlAuthenticate()
             elif not self.IsVersionMatch(request):
-                return self.LoadHtmlCleanCache()
+                return self.VersionMismatchResponse(request)
             else:
                 return await TaskManager.ToThread(handle, request)
         self.web_app.router.add_get(path, new_handle)
@@ -71,7 +71,7 @@ class WebServer:
             if need_auth and not self.IsAuthenticate(request):
                 return self.LoadHtmlAuthenticate()
             elif need_check_version and not self.IsVersionMatch(request):
-                return self.LoadHtmlCleanCache()
+                return self.VersionMismatchResponse(request)
             else:
                 return await handle(request)
         self.web_app.router.add_get(path, new_handle)
@@ -97,12 +97,39 @@ class WebServer:
         return True
 
     @final
+    def WantsJson(self, request: web.Request) -> bool:
+        """Whether this request came from page script rather than the address bar.
+
+        A browser navigating to a page sends `Accept: text/html,...` and no
+        `X-Requested-With`; js/version_guard.js sets the latter on every
+        same-origin request it makes.
+        """
+        if request.headers.get('X-Requested-With'):
+            return True
+        return 'application/json' in request.headers.get('Accept', '')
+
+    @final
+    def VersionMismatchResponse(self, request: web.Request) -> web.StreamResponse:
+        """The mismatch page for a navigation, a 409 for a fetch().
+
+        Handing that page to a fetch() caller only ever surfaced as
+        `JSON.parse: unexpected character <` in the console, which says nothing
+        about the version the page is stuck on.
+        """
+        if self.WantsJson(request):
+            return web.json_response(
+                {'error': 'version_mismatch', 'version': Ver.ui_version_str},
+                status=409,
+            )
+        return self.LoadHtmlCleanCache()
+
+    @final
     def AddHtmlSecurity(self, path: str, html: str):
         async def handle(request: web.Request) -> web.StreamResponse:
             if not self.IsAuthenticate(request):
                 return self.LoadHtmlAuthenticate()
             elif not self.IsVersionMatch(request):
-                return self.LoadHtmlCleanCache()
+                return self.VersionMismatchResponse(request)
             else:
                 return self.ReadFile(html)
         self.web_app.router.add_get(path, handle)
