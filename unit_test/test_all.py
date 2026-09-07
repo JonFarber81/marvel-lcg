@@ -23,8 +23,13 @@ class TestMain(unittest.TestCase):
         from core.utility.debug import Debug
         IsVSDebug = Debug.IsVSDebug
 
+        # `launch-debug.json` is a personal override that is not in the repo.
+        # `FileManager.FindJsonPath` takes the first of these that exists, so a
+        # plain checkout falls back to the `launch.json` that ships with it
+        # instead of failing the config load before a single case runs.
         sys.argv.append("-config_files")
         sys.argv.append("launch-debug.json")
+        sys.argv.append("launch.json")
 
         sys.argv.append('-test')
 
