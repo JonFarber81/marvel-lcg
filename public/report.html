@@ -25,8 +25,25 @@
     <script>
         let receivedData = undefined
         async function do_upload(e) {
-            alert("Upload is disable in Open Source version")
-            return
+            e.disabled = true
+
+            const status = document.querySelector('#status')
+
+            status.textContent = "Uploading..."
+
+            const saveType = receivedData['save_type']
+            // alert(saveType)
+
+            let userInput = document.querySelector('#userInput').value
+            const encodedResponse = encodeURIComponent(userInput);
+            const response_upload = await fetch(`upload_cloudflare?r=${encodedResponse}&t=${saveType}`);
+            const result = await response_upload.text();
+
+            if (response_upload.status >= 200 && response_upload.status < 300) {
+                status.textContent = `Uploaded: ${result}`
+            } else {
+                status.textContent = `Upload failed: (${response_upload.status}) ${result}`
+            }
         }
         function do_cancel(e) {
             window.close()

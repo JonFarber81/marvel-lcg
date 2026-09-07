@@ -1,0 +1,39 @@
+{
+    "version": "0.5.8",
+    "author": "Irefrixs",
+    "cover": "17001a",
+    "comment": "Star-Lord",
+    "seed": 10010001,
+    "villain": [
+        "01094"
+    ],
+    "schemes": [
+        "01097a,01097b"
+    ],
+    "encounter_deck": [
+        "01190"
+    ],
+    "encounter_discard_pile": [],
+    "set_aside": [],
+    "expert": false,
+    "players": [
+        {
+            "identities": [
+                "17001a"
+            ],
+            "hand_cards": [
+                "17002",
+                "01088"
+            ],
+            "player_deck": [],
+            "player_discard_pile": [],
+            "set_aside": []
+        }
+    ],
+    "puzzle_command": [
+        "Puzzle.Damage(c3, 9)",
+        "Puzzle.PutIntoPlay('01101')",
+        "Puzzle.End('Let\\'s defeat the Rhino!')"
+    ],
+    "checksum": "6828020fbc7c6d508637c3d95ebee82d8c4badd14913f7709d7b46ff60b7c0b5"
+}

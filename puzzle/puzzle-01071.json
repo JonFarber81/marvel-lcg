@@ -1,0 +1,39 @@
+{
+    "version": "0.5.8",
+    "author": "Irefrixs",
+    "cover": "01071",
+    "comment": "Make the call",
+    "seed": 10010001,
+    "villain": [
+        "01094"
+    ],
+    "schemes": [
+        "01097a,01097b"
+    ],
+    "encounter_deck": [],
+    "encounter_discard_pile": [],
+    "set_aside": [],
+    "expert": false,
+    "players": [
+        {
+            "identities": [
+                "01001b"
+            ],
+            "hand_cards": [
+                "01071",
+                "01072",
+                "01072"
+            ],
+            "player_deck": [],
+            "player_discard_pile": [
+                "12011"
+            ],
+            "set_aside": []
+        }
+    ],
+    "puzzle_command": [
+        "Puzzle.Damage(c3, 12)",
+        "Puzzle.End('Let\\'s defeat the Rhino!')"
+    ],
+    "checksum": "4781f8bafdf25120675a13092a151611c102526c77b7275f0101c957da200bb6"
+}

@@ -1,0 +1,47 @@
+{
+    "version": "0.5.8",
+    "author": "Irefrixs",
+    "cover": "27043",
+    "comment": "Global Logistics",
+    "seed": 10010001,
+    "villain": [
+        "01094"
+    ],
+    "schemes": [
+        "01097a,01097b"
+    ],
+    "encounter_deck": [
+        "01105",
+        "01105",
+        "01190"
+    ],
+    "encounter_discard_pile": [],
+    "set_aside": [],
+    "expert": false,
+    "players": [
+        {
+            "identities": [
+                "04031b"
+            ],
+            "hand_cards": [
+                "40014",
+                "01014",
+                "01014"
+            ],
+            "player_deck": [
+                "27043",
+                "40060",
+                "36014"
+            ],
+            "player_discard_pile": [],
+            "set_aside": []
+        }
+    ],
+    "puzzle_command": [
+        "Puzzle.Token(c2, 'acceleration_token', 6)",
+        "Puzzle.Damage(c3, 8)",
+        "Puzzle.PutIntoPlay('15007')",
+        "Puzzle.End('Let\\'s defeat the Rhino!')"
+    ],
+    "checksum": "16fcade2d13b745cdd17a4c751266dc8b5db7625eea0bd5b665b748ce4e1021a"
+}

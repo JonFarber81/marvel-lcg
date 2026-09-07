@@ -1,0 +1,57 @@
+{
+    "version": "0.5.8",
+    "author": "Irefrixs",
+    "cover": "01075",
+    "comment": "Black Widow",
+    "seed": 10010001,
+    "villain": [
+        "01094"
+    ],
+    "schemes": [
+        "01097a,01097b"
+    ],
+    "encounter_deck": [
+        "01110",
+        "01110",
+        "01110",
+        "01186",
+        "01154"
+    ],
+    "encounter_discard_pile": [],
+    "set_aside": [],
+    "expert": false,
+    "players": [
+        {
+            "identities": [
+                "06001a"
+            ],
+            "hand_cards": [
+                "15006",
+                "27005",
+                "41007",
+                "44005",
+                "44047"
+            ],
+            "player_deck": [
+                "01090",
+                "06005"
+            ],
+            "player_discard_pile": [],
+            "set_aside": []
+        }
+    ],
+    "puzzle_command": [
+        "Puzzle.Damage(c3, 4)",
+        "Puzzle.Damage(c1, 13)",
+        "Puzzle.Exhaust(c1)",
+        "Puzzle.PlaceThreat(c2, 6)",
+        "Puzzle.Token(c2, 'acceleration_token', 6)",
+        "Puzzle.PutIntoPlay('06009')",
+        "Puzzle.PutIntoPlay('08008')",
+        "Puzzle.PutIntoPlay('08018')",
+        "Puzzle.PutIntoPlay('01075')",
+        "Puzzle.End('Let\\'s defeat the Rhino!')",
+        "Puzzle.Reveal('01154')"
+    ],
+    "checksum": "0c6941373779df695265fa61055eb3ad23a2f3ee261468af5d7c08ebf54838a8"
+}

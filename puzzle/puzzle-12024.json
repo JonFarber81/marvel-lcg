@@ -1,0 +1,42 @@
+{
+    "version": "0.5.8",
+    "author": "Irefrixs",
+    "cover": "12024",
+    "comment": "Team-Building Exercise",
+    "seed": 10010001,
+    "villain": [
+        "01094"
+    ],
+    "schemes": [
+        "01097a,01097b"
+    ],
+    "encounter_deck": [],
+    "encounter_discard_pile": [],
+    "set_aside": [],
+    "expert": false,
+    "players": [
+        {
+            "identities": [
+                "12001a,12001b,12001c"
+            ],
+            "hand_cards": [
+                "12007",
+                "12007",
+                "12007",
+                "12009",
+                "12003"
+            ],
+            "player_deck": [],
+            "player_discard_pile": [],
+            "set_aside": []
+        }
+    ],
+    "puzzle_command": [
+        "Puzzle.Damage(c3, 9)",
+        "Puzzle.PutIntoPlay('12024')",
+        "Puzzle.PutIntoPlay('12024')",
+        "Puzzle.PutIntoPlay('01101')",
+        "Puzzle.End('Let\\'s defeat the Rhino!')"
+    ],
+    "checksum": "2e3f93ceaacfc845874cecc500896dc63faf743381519c9b33a65e22c2eefe72"
+}

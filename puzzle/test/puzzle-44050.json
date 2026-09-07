@@ -1,0 +1,38 @@
+{
+    "version": "0.5.8",
+    "author": "",
+    "cover": "44050",
+    "comment": "",
+    "seed": 10010001,
+    "villain": [
+        "01094"
+    ],
+    "schemes": [
+        "01097a,01097b"
+    ],
+    "encounter_deck": [],
+    "encounter_discard_pile": [],
+    "set_aside": [],
+    "expert": false,
+    "players": [
+        {
+            "identities": [
+                "01001b"
+            ],
+            "hand_cards": [
+                "01079",
+                "01070",
+                "01058",
+                "01091"
+            ],
+            "player_deck": [],
+            "player_discard_pile": [],
+            "set_aside": []
+        }
+    ],
+    "puzzle_command": [
+        "Puzzle.PutIntoPlay('44050')",
+        "Puzzle.End('');"
+    ],
+    "checksum": "b453efbf5c313353ac9ababc02d5e0f4a063ded11211f1bb336332f4f4e82a9a"
+}

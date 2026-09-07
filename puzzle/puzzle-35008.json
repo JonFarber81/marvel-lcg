@@ -1,0 +1,41 @@
+{
+    "version": "0.5.8",
+    "author": "Irefrixs",
+    "cover": "35008",
+    "comment": "Berserker Barrage",
+    "seed": 10010001,
+    "villain": [
+        "01094"
+    ],
+    "schemes": [
+        "01097a,01097b"
+    ],
+    "encounter_deck": [],
+    "encounter_discard_pile": [],
+    "set_aside": [],
+    "expert": false,
+    "players": [
+        {
+            "identities": [
+                "35001a"
+            ],
+            "hand_cards": [
+                "35008"
+            ],
+            "player_deck": [],
+            "player_discard_pile": [],
+            "set_aside": []
+        }
+    ],
+    "puzzle_command": [
+        "Puzzle.Damage(c3, 10)",
+        "Puzzle.PutIntoPlay('35002')",
+        "Puzzle.PutIntoPlay('01102')",
+        "Puzzle.PutIntoPlay('01101')",
+        "Puzzle.PutIntoPlay('01110')",
+        "Puzzle.PutIntoPlay('01103')",
+        "Puzzle.PutIntoPlay('39059')",
+        "Puzzle.End('Let\\'s defeat the Rhino!')"
+    ],
+    "checksum": "1e2740bbf5ea808f975e363df37bdde8d5fe6cccaf4afa5c1b1b46a0e6e77050"
+}
