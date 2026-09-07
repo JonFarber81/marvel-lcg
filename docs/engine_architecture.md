@@ -379,6 +379,23 @@ text = TransText("card_name_key")  # Get translated text
 text = TransText("key", param=value)  # With formatting
 ```
 
+### Image Cache (`engine/file/cache.py`)
+
+`Cache.LoadImage` is the blocking loader: memory, then the image folders, then
+the disk cache, then the card servers, then a generated stand-in. Request
+handlers do not call it directly - they await `Cache.LoadImageAsync`, which
+
+- answers from memory with no thread hop, which is every image after its first
+  serve;
+- otherwise runs the load on `Cache.Pool()`, a `ThreadPoolExecutor` of
+  `image_workers` threads, made on first use and dropped by `Cache.Shutdown()`;
+- keeps one in-flight load per card id (`Cache.pending`), so the several places
+  that ask for the same art in one frame make one download between them.
+
+The pool is separate from the executor behind `TaskManager.ToThread` on purpose:
+a cold New Game screen is ~160 tiles, each up to a 3s request per image server,
+and on the shared executor those fill every thread the rest of the server needs.
+
 ### Image Creator (`engine/lib/image_creator.py`)
 
 Generates placeholder card images when actual images aren't available:
@@ -771,6 +788,7 @@ Create `launch.json` in the project root:
 | `font` | `"cour.ttf"` | Font for placeholder images |
 | `prefetch_images` | `false` | Download every card image, then exit |
 | `prefetch_workers` | `8` | Downloads in flight during a prefetch |
+| `image_workers` | `8` | Image loads in flight while the game is running |
 
 ---
 

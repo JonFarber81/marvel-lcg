@@ -28,19 +28,24 @@ class GameServerFiles(GameServerBase):
             return {'Cache-Control': 'no-store'}
         return self.HeaderCache
 
-    def handle_sets_image(self, request: web.Request) -> web.StreamResponse:
+    # Both image routes are awaited rather than handed to `TaskManager.ToThread`:
+    # `Cache.LoadImageAsync` answers from memory without a thread at all, and
+    # goes to the image pool when it has to read a file or ask a card server, so
+    # a cold cache no longer occupies the executor the rest of the server shares.
+
+    async def handle_sets_image(self, request: web.Request) -> web.StreamResponse:
         file_path = request.path
 
-        image_bytes = Cache.LoadImage(file_path)
+        image_bytes = await Cache.LoadImageAsync(file_path)
 
         return web.Response(body=image_bytes, content_type='image/jpeg', headers=self.ImageHeaders(file_path))
 
-    def handle_image_request(self, request: web.Request) -> web.StreamResponse:
+    async def handle_image_request(self, request: web.Request) -> web.StreamResponse:
         # file_path = request.match_info['path']
         file_path = request.path
         file_path = file_path.split("/")[-1]
 
-        image_bytes = Cache.LoadImage(file_path)
+        image_bytes = await Cache.LoadImageAsync(file_path)
         image_size = len(image_bytes)
 
         self.device_manager.AddSize("Image", image_size)
@@ -57,6 +62,6 @@ class GameServerFiles(GameServerBase):
         self.AddAwaitGetSecurity(r'/p={player:\d+}', self.handle_players_404)
         self.AddAwaitGetSecurity('/watch', self.handle_marvel)
 
-        self.AddNonAwaitGetSecurity(r'/sets/{path:.+}', self.handle_sets_image)
-        self.AddNonAwaitGetSecurity(r'/{path:.+}', self.handle_image_request)
+        self.AddAwaitGetSecurity(r'/sets/{path:.+}', self.handle_sets_image)
+        self.AddAwaitGetSecurity(r'/{path:.+}', self.handle_image_request)
 

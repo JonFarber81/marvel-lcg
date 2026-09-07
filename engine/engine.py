@@ -175,6 +175,9 @@ class Engine:
             from editor.editor import Editor
             Editor.Shutdown()
 
+        from engine.file import Cache
+        Cache.Shutdown()
+
         JobManager.Shutdown()
         TaskManager.Shutdown()
 
