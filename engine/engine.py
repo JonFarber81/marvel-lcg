@@ -12,6 +12,7 @@ from engine.job import JobManager
 from engine.device.manager.base import DeviceManager
 from engine.lib.check_new_version import CheckForNewVersion
 from engine.config import ConfigVariables
+from engine.startup_error import StartupError
 
 CATEGORY_NAME = "ENGINE"
 
@@ -115,14 +116,18 @@ class Engine:
             Engine.game = Game(Engine.statistics, Engine.device_manager)
             return True
 
-        if Build.release:
-            try:
-                return initialize()
-            except Exception as exc:
-                Log.OnCrash(CATEGORY_NAME, exc, "", None)
-                return False
-        else:
+        try:
             return initialize()
+        except StartupError as exc:
+            # Something the player can fix, named in the message: a port already
+            # in use, a folder that is not there. One line is the whole story.
+            Log.Assert(CATEGORY_NAME, str(exc))
+            return False
+        except Exception as exc:
+            if not Build.release:
+                raise
+            Log.OnCrash(CATEGORY_NAME, exc, "", None)
+            return False
 
     @staticmethod
     def EngineRun() -> None:
@@ -169,7 +174,12 @@ class Engine:
     @staticmethod
     def SaveCrash():
         if not Engine.has_crashed:
-            Engine.game.session.SaveScene(f'./crash.json', delete_old=False)
+            # A crash during start-up gets here before `Engine.game` is assigned.
+            # There is no scene to save then, and reaching for one turns one
+            # traceback into two, hiding the first - which is the real one.
+            game = getattr(Engine, 'game', None)
+            if game is not None:
+                game.session.SaveScene(f'./crash.json', delete_old=False)
             Engine.has_crashed = True
         if Engine.in_unit_test:
             exit(-1)
