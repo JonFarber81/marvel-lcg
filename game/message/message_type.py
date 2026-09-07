@@ -296,9 +296,12 @@ class HasEndEventMessage(Message2):
 ################################################################################
 #
 class DeckMessage(Message2):
-    def __init__(self, deck: 'Deck') -> None:
+    def __init__(self, deck: 'Deck', **kwargs: Any) -> None:
         self.deck: Final = deck
-        super().__init__(world=deck.world)
+        # Forwarded so a deck message can also be a `CanBeInstead` /
+        # `HasEndEventMessage` pair, the way the card messages are.
+        kwargs.pop('world', None)
+        super().__init__(world=deck.world, **kwargs)
 
 ################################################################################
 #

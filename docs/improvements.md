@@ -67,7 +67,8 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 | # | Item | Pri | Eff |
 |---|------|-----|-----|
 | 5.1 | **RRG version selector instead of seven checkboxes.** The `v16_*` toggles (`scene.html:803-810`) are correct but unfamiliar to new players. Offer a single "Rules: RRG 1.6 (current) / 1.5" selector that sets them as a group, with the checkboxes under an "Advanced" disclosure. Default to 1.6. | P2 | S |
-| 5.2 | **"Pre message" hooks are missing across the message senders.** Fourteen `# TODO: Pre message` markers in `game/message/sender/sender_{card,player,scheme,damage,deck}.py` mean there is no "would" event before those actions, so cancel/replace/prevent effects can't intercept them. This is the single largest source of subtle card-interaction bugs. | P1 | L |
+| 5.2 | **PARTLY DONE** - four of the fourteen markers now have a real "would" event: `WhenDeckWouldShuffle`, `WhenDeckWouldRunOut`, `WhenDeckWouldReset` and `WhenDamageWouldBePrevented`, each a `CanBeInstead` paired to its `After...` through `HasEndEventMessage`/`HasPreEventMessage`, with matching `AbilityFactory` helpers. Standing in for a shuffle leaves the order alone and sends no `AfterDeckShuffle`; standing in for a reset skips `process_after_shuffle`, which **is** the penalty (an encounter card for a player deck, an acceleration token for the encounter deck); standing in for a run-out skips the reshuffle rule that hangs off `AfterDeckRunOut`; and `PreventDamage` now returns 0 without recording anything, which is where "this damage cannot be prevented" belongs. The other ten are not "add a would here" (see 5.2a). | P1 | L |
+| 5.2a | **The remaining ten `# TODO: Pre message` markers, and why each is not a drop-in.** **Already interceptable upstream, so the After is a notification and the honest fix is chaining it to the pre-message that exists, not a second cancel point:** `AfterUnitDefeatedScheme` (behind `WhenSchemeWouldBeDefeated`), `AfterPlayerDrewCards` (behind a per-card `WhenPlayerWouldDrawCard`), `AfterCardGainUpgradeAbility` and `AfterCardLostUpgradeAbility` (behind `WhenCardWouldAttachTo`), `WhenCardBeSpendAsResource` (behind `WhenPlayerPayingResources`). **Real gaps, but entangled:** `Card.Exhaust` has no "would" while `Card.Ready` beside it does (`card.py:573` vs `587`), but it is reached through `CostFunc.Exhaust` on ~487 call sites, so a cancellable exhaust needs every exhaust-as-a-cost path to handle a refusal or the cost is treated as paid anyway; `DetachFrom2` is the same asymmetry against `AttachTo2`, but it is also called from `OnLeavedPlayEnd`, where cancelling would leave an upgrade attached to a card that has left play. **Not a cancellable moment as built:** `AfterCardGainTrait` and `AfterCardLoseTrait` are `CardStateUpdatedMessage`, which `Message2.Send` routes to `StackMessage` after the mutation. **Not a site:** the marker at `sender_damage.py:872` sits on a commented-out class. | P1 | L |
 | 5.3 | **Known rule gaps flagged in card scripts** (search `TODO` under `cards/pack/`): Klaw *Sonic Boom* must-choose-a-fulfillable-option (`core/klaw/01123.py`), Kang stage completes when all players at a stage are defeated (`toafk/kang/__init__.py:146`), Doctor Strange 09020 "take no damage" timing, Mojo *Magog* win-condition (`mojo/magog/39002b.py`), Civil War enemy-team choice and "your leader" (`cw/hells_kitchen/56191.py`, `cw/dangerous_recruits/56090.py`), *Return the Favor* cancel interaction (`ability/cost_func.py:1035`), Angel 42008 reuse after gaining 28012. | P2 | M each |
 | 5.4 | **Obligation ownership isn't enforced.** `game/card/face/card_type/obligation.py:9` notes that only the player holding an obligation may trigger its abilities or pay its costs; that restriction isn't implemented yet, so other players can currently interact with it. | P2 | S |
 | 5.5 | **Face-up cards in the encounter deck** aren't included by `Find` (`operate/find.py:134` is a commented-out `faces=` parameter), so any effect that searches or counts face-up encounter cards misses them. | P3 | M |
@@ -77,13 +78,16 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 
 1. ~~§2.1, §2.2, §1.2, §3.1~~ — **done** (plus §3.1a, a latent race the speedup uncovered).
 2. ~~§1.3, §1.4, §4.2~~ — **done** (progress bar, hero gallery, autosave and resume).
-3. ~~§5.6~~ — **done** (the regression net); §5.2 is now safe to start, and every step of it should be run against `python -m unittest unit_test.test_scripted`.
+3. ~~§5.6~~ — **done** (the regression net); §5.2 is started (the four self-contained markers), and every further step of it should be run against `python -m unittest unit_test.test_scripted` **and** bring its own cases - the seven that ship cover none of the paths §5.2a names.
 4. §4.4 — the remaining large playability investment (~~§4.6~~ **done**).
 
 ### Done so far
 
 §1.1 – §1.4, §1.6, §1.7, §1.9, §1.10 · §2.1 – §2.10 (all of Usability) · §3.1, §3.1a, §3.2 · §4.2, §4.6 · §5.6.
+Partly: §5.2 (four of fourteen markers; §5.2a is the account of the other ten).
 
-Still open: §1.5, §1.8 · §3.3 – §3.5 · §4.1, §4.3 – §4.5, §4.7, §4.8 · §5.1 – §5.5.
-§5.2 is the next one worth taking: it is the last P1 open, and the scripted
-regression net (§5.6) is what makes it safe to start.
+Still open: §1.5, §1.8 · §3.3 – §3.5 · §4.1, §4.3 – §4.5, §4.7, §4.8 · §5.1, §5.3 – §5.5.
+The rest of §5.2 is the largest thing left, and §5.2a splits it into the three
+kinds of work it actually is. The exhaust and detach pair is the piece worth
+taking next, and it wants its own scripted cases before it starts: the current
+seven are Core Set Rhino and Ultron, and they walk none of these paths.

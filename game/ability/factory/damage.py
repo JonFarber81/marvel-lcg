@@ -654,6 +654,44 @@ class AbilityFactoryDamage:
         )
 
     @staticmethod
+    def WhenDamageWouldBePrevented(ability_type: 'AbilityType',
+                                operation: OperationType[Message.WhenDamageWouldBePrevented],
+                                *,
+                                who_not_take_damage: CardType=None,
+                                prevent_by: CardType=None,
+                                is_from_attack: bool|None=None,
+                                conditions: ConditionsType[Message.WhenDamageWouldBePrevented]=[],
+                                ) -> 'Ability':
+        """Before the prevention, where `message.SetBeInstead(effect)` stops it -
+        this is where "this damage cannot be prevented" belongs.
+
+        There is no `damage_more_than` here on purpose: the amount has not been
+        worked out yet, and "All" is still "All"."""
+
+        def check_is_from_attack(effect: 'Effect', message: 'Message.WhenDamageWouldBePrevented') -> bool:
+            if is_from_attack == None:
+                return True
+            return is_from_attack == message.IsFromAttack()
+
+        def check_who_not_take_damage(effect: 'Effect', message: 'Message.WhenDamageWouldBePrevented') -> bool:
+            return Condition.CheckWhichCard(who_not_take_damage, message.trigger, effect)
+
+        def check_prevent_by(effect: 'Effect', message: 'Message.WhenDamageWouldBePrevented') -> bool:
+            return Condition.CheckWhichCard(prevent_by, message.prevent_by_effect.this, effect)
+
+        return Ability(
+            ability_type,
+            Message.WhenDamageWouldBePrevented,
+            [
+                *conditions,
+                check_who_not_take_damage,
+                check_prevent_by,
+                check_is_from_attack,
+            ],
+            operation
+        )
+
+    @staticmethod
     def AfterDamageBePrevented(ability_type: 'AbilityType',
                                 operation: OperationType[Message.AfterDamageBePrevented],
                                 *,
