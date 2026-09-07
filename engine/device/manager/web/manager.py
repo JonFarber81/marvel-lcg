@@ -5,12 +5,15 @@ from engine.device import *
 from engine.controller import *
 from engine.device.manager.web.client import ClientManager
 from engine.network.net_lib import NetLib
+from engine.startup_error import StartupError
 
 IP                  = ConfigVariables.Str('ip', "")
 PORT                = ConfigVariables.Int('port', 2345)
 SERVER_ADDRESSES    = ConfigVariables.ListStr('server_addresses', [
     "127.0.0.1:2345"
 ])
+# How many ports past the asked-for one to try before giving that address up.
+PORT_FALLBACK_TRIES = ConfigVariables.Int('port_fallback_tries', 10)
 
 CATEGORY_NAME = "WEB_DEVICE_MANAGER"
 
@@ -41,13 +44,49 @@ class WebDeviceManager(DeviceManager):
                 continue
 
             ip, port = ip_port
-            assert NetLib.IsPortAvailable(ip, port), f"{ip=}, {port=}"
+            free_port = WebDeviceManager.FindFreePort(ip, port)
+            if free_port is None:
+                tried_ports = WebDeviceManager.PortRange(port)
+                span = f"{port}" if len(tried_ports) <= 1 else f"{port}-{tried_ports[-1]}"
+                Log.Warn(CATEGORY_NAME, f"{ip}:{span} is in use - skipping this address")
+                continue
+            if free_port != port:
+                Log.Warn(CATEGORY_NAME, f"{ip}:{port} is in use - serving on {ip}:{free_port} instead")
+            port = free_port
 
             self.httpds.append(GameServer(self))
             self.httpds[-1].Run(ip, port, "Server")
 
+        if not self.httpds:
+            # Nothing is listening, so nothing can be played. Name the addresses
+            # that were tried and how to pick another one; the stack that got us
+            # here says nothing the player can act on.
+            tried = ", ".join(sorted(set(server_addresses)))
+            raise StartupError(f"No free address to serve on (tried {tried}). "
+                               "Close the other copy of the game, or start this one "
+                               "on a free port: py main.py -port 2400")
+
         self.stat_sent_size: Dict[str, int] = {}
 
+    @staticmethod
+    def PortRange(port: int) -> range:
+        """The port that was asked for, then the fallbacks after it."""
+        return range(port, min(port + max(PORT_FALLBACK_TRIES.value, 1), 65536))
+
+    @staticmethod
+    def FindFreePort(ip: str, port: int) -> int|None:
+        """The asked-for port, or the first free one after it.
+
+        A second copy of the game - or anything else holding 2345 - used to take
+        the whole start-up down. Ports are cheap, so walk forward a few and let
+        the caller report which one was actually taken."""
+        for candidate in WebDeviceManager.PortRange(port):
+            if NetLib.IsPortAvailable(ip, candidate):
+                return candidate
+        return None
+
+    ################################################################################
+    #
     @override
     def CreateDevices(self, controller: 'Controller') -> Tuple['OutputDevice', 'InputDevice']:
         from engine.device.web import WebDevice
