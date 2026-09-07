@@ -44,7 +44,7 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 |---|------|-----|-----|
 | 3.1 | **DONE** - Serial fetches on the New Game screen. `createScenarios()` and `createSets()` awaited one request per button, ~278 round-trips back to back. Both now warm a memo in a single `Promise.all` burst; measured 658ms -> 89ms on loopback, and the gain scales with latency. Also fixed the load-order race this exposed (see 3.1a). | P1 | S |
 | 3.1a | **DONE** - Latent load-order race, exposed by 3.1. The Weekly Challenges tile reveals checkbox labels built by a deferred `<script type="module">`; nothing ordered the two, and the tile only worked because it was blocked behind ~160 serial fetches. Once those went parallel it hit `getElementById(...).parentElement` on `null`, killing tile construction and `createSets()` entirely. Replaced with an explicit `challenge_ui_ready` promise handshake plus a null guard. | P1 | S |
-| 3.2 | **Image downloads block request handlers.** `Cache.LoadImage` calls `requests.get` with a 3 s timeout per server, inside `TaskManager.ToThread`; on a cold cache each tile image is a synchronous remote fetch. Combine with §2.10 and add a small thread pool so misses are fetched in parallel. | P1 | M |
+| 3.2 | **DONE** - Image loads have their own pool. They used to be handed to `TaskManager.ToThread`, the executor every other request handler shares, so a cold New Game screen - ~160 tiles, each up to a 3s `requests.get` per image server - filled every thread the rest of the server needed. `Cache.LoadImageAsync` now answers from memory with no thread hop at all (every image after its first serve), and otherwise runs the load on `Cache.Pool()`, a pool of `image_workers` threads made on first use. `Cache.pending` keeps one in-flight load per card id, so the several places that ask for the same art in one frame make one download between them instead of each holding a thread for the same 3s. Measured: 40 cold images in flight, and `scene.html` still answers in 2ms. | P1 | M |
 | 3.3 | **Unbounded in-memory image cache.** `Cache.cache` is a plain dict holding every JPEG served (154 MB on disk after one New Game screen load, all of it also resident in RAM). Replace with an LRU (`functools.lru_cache` sized by bytes, or `cachetools.LRUCache`) or serve files via `web.FileResponse` and let the OS page cache do the work. | P2 | S |
 | 3.4 | **Every first load decodes through PIL.** `TryRotateImage` opens each image with Pillow just to check orientation, even when no rotation is needed. Persist the already-rotated result to `assets/cache` once and skip PIL on later loads. | P3 | S |
 | 3.5 | **Set tile art is re-encoded to JPEG** from `.webp` on the fly (same path as 3.4). Serve `.webp` bytes with the correct `Content-Type` when no rotation is required. | P3 | S |
@@ -82,8 +82,8 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 
 ### Done so far
 
-§1.1, §1.2, §1.3, §1.4, §1.6, §1.7, §1.9 · §2.1 – §2.10 (all of Usability) · §3.1, §3.1a · §4.6 · §5.6.
+§1.1, §1.2, §1.3, §1.4, §1.6, §1.7, §1.9 · §2.1 – §2.10 (all of Usability) · §3.1, §3.1a, §3.2 · §4.6 · §5.6.
 
-Still open: §1.5, §1.8, §1.10 · §3.2 – §3.5 · §4.1 – §4.5, §4.7, §4.8 · §5.1 – §5.5.
-§3.2 is the next one worth taking: §2.10 now downloads the same images through a
-thread pool, so the pieces it needs are already there.
+Still open: §1.5, §1.8, §1.10 · §3.3 – §3.5 · §4.1 – §4.5, §4.7, §4.8 · §5.1 – §5.5.
+§4.2 is the next one worth taking: it is the open half of step 2 below, and
+§1.10 is the menu entry that finishes it.

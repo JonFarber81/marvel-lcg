@@ -1,4 +1,7 @@
 from core import *
+import asyncio
+import threading
+from concurrent.futures import Future, ThreadPoolExecutor
 import requests
 from engine.lib import ImageCreator, ImageLib
 from engine.log import Log
@@ -11,6 +14,7 @@ IMAGE_FOLDERS   = ConfigVariables.Folders('image_folders', ["./assets/pics/"])
 TEXTURE_FOLDER  = ConfigVariables.Folder('texture_folder', "./assets/textures/")
 CACHE_FOLDER    = ConfigVariables.Folder('cache_folder', "./assets/cache/")
 IMAGE_SERVERS   = ConfigVariables.ListStr('image_servers', [])
+IMAGE_WORKERS   = ConfigVariables.Int('image_workers', 8)
 # `save_empty_image` is gone: generated stand-ins are no longer written to disk.
 BREAK_WHEN_LOAD_ONLINE_IMAGE = ConfigVariables.Bool('break_when_load_online_image', False)
 
@@ -20,6 +24,18 @@ class Cache:
     link_pic: Dict[str, str] = {}
     # Ids currently served by a generated stand-in rather than real art.
     placeholders: Set[str] = set()
+
+    # Images are loaded on their own pool rather than on the executor every
+    # other request handler hands its work to (`TaskManager.ToThread`). A cold
+    # New Game screen is ~160 tiles, and a tile that is not on disk yet is a
+    # blocking `requests.get` of up to 3s per image server: on the shared
+    # executor those fill every thread it has, and the JSON the page needs to
+    # finish drawing itself queues behind card art it has not asked to see yet.
+    pool: 'ThreadPoolExecutor|None' = None
+    # Guards `pool` and `pending` together: a caller that finds no pending load
+    # creates the pool and the entry in one step.
+    pool_lock = threading.RLock()
+    pending: Dict[str, 'Future[bytes]'] = {}
 
     # The art pack ships separately from the repo (install guide step 6).
     # `CheckAssets` fills these in at start-up; the menu reads them back.
@@ -138,6 +154,64 @@ class Cache:
             except requests.exceptions.RequestException as e:
                 Log.Warn(CATEGORY_NAME, f"Request failed with error: {e}")
         return None
+
+    @staticmethod
+    def Pool() -> 'ThreadPoolExecutor':
+        """The image pool, made on first use.
+
+        Nothing creates it at start-up: a run that serves no images - a replay
+        check, `-rehash`, the scripted tests - never makes a thread."""
+        with Cache.pool_lock:
+            if Cache.pool is None:
+                Cache.pool = ThreadPoolExecutor(max_workers=max(1, IMAGE_WORKERS.value),
+                                                thread_name_prefix="image")
+            return Cache.pool
+
+    @staticmethod
+    def Shutdown() -> None:
+        """Drop the pool. Loads still queued are abandoned - they are pictures,
+        and the process is on its way out."""
+        with Cache.pool_lock:
+            pool, Cache.pool = Cache.pool, None
+            Cache.pending.clear()
+        if pool is not None:
+            pool.shutdown(wait=False, cancel_futures=True)
+
+    @staticmethod
+    def ForgetPending(card_id: str) -> None:
+        with Cache.pool_lock:
+            Cache.pending.pop(card_id, None)
+
+    @staticmethod
+    def LoadImageFuture(card_id: str) -> 'Future[bytes]':
+        """One in-flight load per card, however many callers ask for it at once.
+
+        The board asks for the same art from several places in the same frame,
+        and a reload asks for all of it again before the first answers. Without
+        this each of those is its own download of the same card, and each one
+        holds a pool thread for the 3s the server takes to answer."""
+        with Cache.pool_lock:
+            pending = Cache.pending.get(card_id)
+            if pending is not None:
+                return pending
+            future = Cache.Pool().submit(Cache.LoadImage, card_id)
+            Cache.pending[card_id] = future
+            # A future that finished before this line runs the callback here, on
+            # this thread, while the lock is still held - hence the RLock.
+            future.add_done_callback(lambda _: Cache.ForgetPending(card_id))
+            return future
+
+    @staticmethod
+    async def LoadImageAsync(card_id: str) -> bytes:
+        """`LoadImage` without holding a request thread while it works.
+
+        An image already in memory - which is every image after the first time
+        it is served - answers from here, with no thread hop at all."""
+        card_id = card_id.lstrip("/")
+        data = Cache.cache.get(card_id)
+        if data is not None:
+            return data
+        return await asyncio.wrap_future(Cache.LoadImageFuture(card_id))
 
     @staticmethod
     def LoadImage(card_id: str) -> bytes:
