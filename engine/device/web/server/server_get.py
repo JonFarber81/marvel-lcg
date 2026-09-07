@@ -158,6 +158,42 @@ class GameServerGet(GameServerBase):
         assert file
         return self.ReadReplayFile(file)
 
+    async def get_autosave_status(self, request: web.Request) -> web.Response:
+        """What the main menu needs to draw its Continue button.
+
+        The slot is an ordinary replay file, so this reads it the same way the
+        replay list reads one, and adds the round it stopped on. `exists` is
+        false whenever there is nothing to continue - no file, or a file this
+        build can no longer read - and the menu simply draws no button."""
+        from game.game_run.game_session import GameSession
+        from game.scene.scene import Scene
+
+        file_path = GameSession.AutoSavePath()
+        if not FileManager.Exists(file_path):
+            return web.json_response({"exists": False})
+
+        try:
+            scene, _checksum = Json.LoadAsInternal(file_path, Scene)
+        except Exception:
+            # A save from a build whose format has moved on. Nothing to do about
+            # it here, and a menu that cannot read it must not fail to draw.
+            return web.json_response({"exists": False})
+
+        return web.json_response({
+            "exists": True,
+            "time": scene.time,
+            "cover": scene.cover,
+            "comment": scene.comment,
+            "villain": scene.campaign.villain[0] if scene.campaign.villain else
+                       (scene.campaign.schemes[0] if scene.campaign.schemes else ""),
+            "scenario": scene.campaign.name,
+            "expert": scene.campaign.expert,
+            "players": [x.hero[0] for x in scene.players],
+            "names": [x.name for x in scene.players],
+            "round": scene.GetMetadataInt("round"),
+            "step": len(scene.inputs),
+        })
+
     async def get_assets_status(self, request: web.Request) -> web.Response:
         """What the main menu needs to say the art pack is missing.
 
@@ -206,6 +242,7 @@ class GameServerGet(GameServerBase):
         self.AddAwaitGetSecurity('/get_puzzle_json', self.get_puzzle_json)
         self.AddAwaitGetSecurity('/get_replay_json', self.get_replay_json)
 
+        self.AddAwaitGetSecurity('/get_autosave_status', self.get_autosave_status)
         self.AddAwaitGetSecurity('/get_assets_status', self.get_assets_status)
 
         self.AddAwaitGetSecurity('/get_gamers', self.get_gamers)

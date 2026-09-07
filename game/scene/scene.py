@@ -21,7 +21,9 @@ METADATA_KEY_BOOL = Literal[
 ]
 
 METADATA_KEY_INT = Literal[
-    "seed"
+    # `round` is written by the autosave, so the main menu can say which round
+    # the game it is offering back stopped on.
+    "seed", "round"
 ]
 
 METADATA_KEY_STR = Literal[

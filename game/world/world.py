@@ -567,6 +567,11 @@ class World(WorldAction, WorldFind):
             if self.is_game_over:
                 return
 
+            # The round's cards are dealt and revealed and nothing is waiting on
+            # a player, so this is where the game in progress is written to the
+            # autosave slot the main menu offers back (improvements 4.2).
+            self.controller_manager.game.session.AutoSave()
+
             end_round()
 
 

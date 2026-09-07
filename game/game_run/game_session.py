@@ -18,6 +18,9 @@ CATEGORY_NAME = "SESSION"
 
 REPLAY_FOLDERS = ConfigVariables.Folders('replay_folders')
 
+AUTO_SAVE       = ConfigVariables.Bool('auto_save', True)
+AUTO_SAVE_FILE  = ConfigVariables.File('auto_save_file', "./saves/autosave.json")
+
 class GameSession:
 
     def __init__(self, game: 'Game') -> None:
@@ -175,6 +178,68 @@ class GameSession:
             return file_name
         else:
             return None
+
+    ################################################################################
+    # The game in progress, kept in one slot the main menu can offer back.
+    #
+    @staticmethod
+    def AutoSavePath() -> str:
+        return AUTO_SAVE_FILE.value
+
+    def AutoSave(self) -> None:
+        """Write the game so far to the autosave slot.
+
+        Called at the end of every villain phase, which is the one moment in a
+        round where nothing is half-resolved: the round's cards are all dealt
+        and revealed, and no player has been asked anything yet. A save is the
+        recipe plus the inputs that got here, so the slot is an ordinary replay
+        file - `Continue` replays it and hands the game back."""
+        from game.test import Test
+
+        if not AUTO_SAVE.value:
+            return
+
+        scene = self.scene
+        if scene is None or scene.is_puzzle:
+            return
+
+        # A replay is somebody else's finished game being watched, and the
+        # fast-forward through a load or an undo passes every villain phase it
+        # replays - saving on each of those would overwrite the slot with a
+        # position the player is on their way back from.
+        controller_manager = self.game.controller_manager
+        if controller_manager.replay.is_replay or controller_manager.skip.is_skipping:
+            return
+        if Test.IsInTesting():
+            return
+
+        if self.world:
+            scene.SetMetadataInt("round", self.world.round_id)
+        scene.Save(AUTO_SAVE_FILE.value, self.game, playtime=self.GetPlayTime(scene))
+
+    def LoadAutoSave(self) -> bool:
+        """Pick the autosave up where it was left.
+
+        `skip_to = -1` is the "to the end" form `InitializeSkip` reads for a
+        load: it replays every recorded input and then stops skipping, so the
+        player is asked the next question rather than shown the game again."""
+        from game.scene.loader import LoaderHelper
+
+        file_path = AUTO_SAVE_FILE.value
+        if not FileManager.Exists(file_path):
+            return False
+
+        scene = LoaderHelper.Loads(file_path)
+        self.LoadScene(scene, -1, 'Load')
+        Notify.Command(f"Continue: {file_path}")
+        return True
+
+    def ClearAutoSave(self) -> None:
+        """Drop the slot once its game has finished, so the menu stops offering
+        a game that is already over."""
+        file_path = AUTO_SAVE_FILE.value
+        if FileManager.Exists(file_path):
+            FileManager.Delete(file_path)
 
     ################################################################################
     #

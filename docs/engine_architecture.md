@@ -788,6 +788,8 @@ Create `launch.json` in the project root:
 | `font` | `"cour.ttf"` | Font for placeholder images |
 | `prefetch_images` | `false` | Download every card image, then exit |
 | `prefetch_workers` | `8` | Downloads in flight during a prefetch |
+| `auto_save` | `true` | Save the game at the end of every villain phase |
+| `auto_save_file` | `"./saves/autosave.json"` | The slot the main menu's Continue reads |
 | `image_workers` | `8` | Image loads in flight while the game is running |
 
 ---
