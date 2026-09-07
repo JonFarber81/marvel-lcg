@@ -1,6 +1,4 @@
 from aiohttp import web
-import io
-from PIL import Image
 from urllib.parse import parse_qs
 
 from engine.lib import Json
@@ -33,21 +31,11 @@ class EditorHttp(WebServer):
         return web.json_response(data)
 
     async def handle_image(self, request: web.Request):
-        file_path = request.path
-        image_bytes = Cache.LoadImage(file_path)
-
-        def image_to_byte_array(image: Image.Image) -> bytes:
-            bytes_io = io.BytesIO()
-            image.save(bytes_io, format='jpeg')
-            return bytes_io.getvalue()
-
-        img_io = Image.open(io.BytesIO(image_bytes))
-        width, height = img_io.size
-        if width > height:
-            img_io = img_io.rotate(90, expand=True)
-            image_bytes = image_to_byte_array(img_io)
-
-        return web.Response(body=image_bytes, content_type='image/jpeg')
+        # `Cache` already stands a landscape image up, and says what format the
+        # bytes it hands back are in; the editor used to open every image again
+        # to repeat the first half of that and then call the result a JPEG.
+        image = Cache.LoadImageData(request.path)
+        return web.Response(body=image.data, content_type=image.content_type)
 
     async def handle_post(self, request: web.Request):
         body = await request.read()

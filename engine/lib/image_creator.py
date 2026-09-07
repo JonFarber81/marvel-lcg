@@ -16,17 +16,79 @@ class ImageLib:
         image.save(bytes_io, format='jpeg')  # You can change the format if needed
         return bytes_io.getvalue()
 
+    # EXIF orientations 5-8 are the ones that turn the picture a quarter turn,
+    # so the width and height a decoder reports are swapped from what a browser
+    # will show. The rest (1-4) leave the shape alone.
+    EXIF_ORIENTATION_TAG = 0x0112
+    EXIF_QUARTER_TURNS = (5, 6, 7, 8)
+
     @staticmethod
-    def TryRotateImage(image_data: bytes) -> bytes:
+    def ImageShape(image_data: bytes) -> Tuple[int, int]|None:
+        """The size a browser would give this image, read from its header.
+
+        `Image.open` parses the header and stops - no pixels are decoded - so
+        this costs a few hundred bytes of parsing rather than a full decode."""
+        try:
+            image = Image.open(io.BytesIO(image_data))
+        except Exception:
+            return None
+        width, height = image.size
+        try:
+            orientation = image.getexif().get(ImageLib.EXIF_ORIENTATION_TAG, 1)
+        except Exception:
+            orientation = 1
+        if orientation in ImageLib.EXIF_QUARTER_TURNS:
+            width, height = height, width
+        return width, height
+
+    @staticmethod
+    def RotateIfNeeded(image_data: bytes) -> Tuple[bytes, bool]:
+        """Stand a landscape image up, and say whether it had to.
+
+        A card is served portrait. Nine images in ten already are, and for those
+        this reads the header and hands back the bytes it was given: no decode,
+        no re-encode, and the file keeps whatever format it was stored in (a set
+        tile stays a `.webp`). Only a landscape image is opened for real.
+
+        Orientation is taken from the header rather than from `exif_transpose`,
+        which decodes the whole image just to answer the question."""
+        shape = ImageLib.ImageShape(image_data)
+        if shape is None:
+            return image_data, False
+        width, height = shape
+        if width <= height:
+            return image_data, False
+
         img_io: Image.Image = Image.open(io.BytesIO(image_data))
         # 1. Normalize orientation based on EXIF tags (what the browser does)
         # This physically rotates pixels so 'top-left' is actually top-left.
         img_io = ImageOps.exif_transpose(img_io)
-        width, height = img_io.size
-        if width > height:
-            img_io = img_io.rotate(90, expand=True)
-            image_data = ImageLib.ImageToByteArray(img_io)
-        return image_data
+        img_io = img_io.rotate(90, expand=True)
+        return ImageLib.ImageToByteArray(img_io), True
+
+    # Sniffed from the bytes rather than taken from the file name: a download is
+    # named by the `Content-Type` the server claimed, and an image folder is a
+    # place a player drops files by hand.
+    MAGIC_CONTENT_TYPES = [
+        (b'\xff\xd8\xff', 'image/jpeg'),
+        (b'\x89PNG\r\n\x1a\n', 'image/png'),
+        (b'GIF87a', 'image/gif'),
+        (b'GIF89a', 'image/gif'),
+    ]
+
+    @staticmethod
+    def ContentTypeOf(image_data: bytes) -> str:
+        """What to call these bytes on the wire, defaulting to JPEG.
+
+        Everything this cache makes itself - a rotation, a stand-in - is a JPEG,
+        so an unrecognised header is served as one, which is what every image was
+        called before any of this."""
+        for magic, content_type in ImageLib.MAGIC_CONTENT_TYPES:
+            if image_data.startswith(magic):
+                return content_type
+        if image_data[:4] == b'RIFF' and image_data[8:12] == b'WEBP':
+            return 'image/webp'
+        return 'image/jpeg'
 
 class ImageCreatorHelper:
     import re

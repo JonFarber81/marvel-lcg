@@ -45,9 +45,9 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 | 3.1 | **DONE** - Serial fetches on the New Game screen. `createScenarios()` and `createSets()` awaited one request per button, ~278 round-trips back to back. Both now warm a memo in a single `Promise.all` burst; measured 658ms -> 89ms on loopback, and the gain scales with latency. Also fixed the load-order race this exposed (see 3.1a). | P1 | S |
 | 3.1a | **DONE** - Latent load-order race, exposed by 3.1. The Weekly Challenges tile reveals checkbox labels built by a deferred `<script type="module">`; nothing ordered the two, and the tile only worked because it was blocked behind ~160 serial fetches. Once those went parallel it hit `getElementById(...).parentElement` on `null`, killing tile construction and `createSets()` entirely. Replaced with an explicit `challenge_ui_ready` promise handshake plus a null guard. | P1 | S |
 | 3.2 | **DONE** - Image loads have their own pool. They used to be handed to `TaskManager.ToThread`, the executor every other request handler shares, so a cold New Game screen - ~160 tiles, each up to a 3s `requests.get` per image server - filled every thread the rest of the server needed. `Cache.LoadImageAsync` now answers from memory with no thread hop at all (every image after its first serve), and otherwise runs the load on `Cache.Pool()`, a pool of `image_workers` threads made on first use. `Cache.pending` keeps one in-flight load per card id, so the several places that ask for the same art in one frame make one download between them instead of each holding a thread for the same 3s. Measured: 40 cold images in flight, and `scene.html` still answers in 2ms. | P1 | M |
-| 3.3 | **Unbounded in-memory image cache.** `Cache.cache` is a plain dict holding every JPEG served (154 MB on disk after one New Game screen load, all of it also resident in RAM). Replace with an LRU (`functools.lru_cache` sized by bytes, or `cachetools.LRUCache`) or serve files via `web.FileResponse` and let the OS page cache do the work. | P2 | S |
-| 3.4 | **Every first load decodes through PIL.** `TryRotateImage` opens each image with Pillow just to check orientation, even when no rotation is needed. Persist the already-rotated result to `assets/cache` once and skip PIL on later loads. | P3 | S |
-| 3.5 | **Set tile art is re-encoded to JPEG** from `.webp` on the fly (same path as 3.4). Serve `.webp` bytes with the correct `Content-Type` when no rotation is required. | P3 | S |
+| 3.3 | **DONE** - The image cache has a ceiling. `Cache.cache`, a plain dict that kept every JPEG the server had ever handed out, is now `ImageMemory`: an `OrderedDict` under a budget in bytes (`image_cache_mb`, 64 by default, ~175 cards - several times what a game has on the table; 0 means the old unlimited behaviour). Serving is a touch, so what falls out first is what nothing has looked at for longest, and an image bigger than the whole budget is still served, it is simply first out next time. Measured by asking one server for all 953 cards in `assets/cache`: 399 MB resident before, 128 MB after (~72 MB of that is the process itself), and a real Rhino game sits at 88 MB. Stand-ins are held apart from the budget rather than in it - a stand-in means no server had the card, and letting one be evicted would put that 3s-per-server question back on the next request for it. | P2 | S |
+| 3.4 | **DONE** - A portrait image is no longer decoded to find out that it is portrait. `TryRotateImage` opened every image and called `ImageOps.exif_transpose`, which copies - and copying a lazily-opened file decodes all of it - just to compare width against height. `ImageLib.RotateIfNeeded` reads the size and the EXIF orientation out of the header instead (`Image.open` stops there; orientations 5-8 swap the two) and hands the bytes back untouched when nothing has to happen, which is nine images in ten: 200 cards fell from 939ms to 200ms, and the 59 set tiles from 90ms to 3ms. The tenth is rotated as before, and the result is now kept in `assets/cache/rotated/` - its own folder, because a rotation sharing the original's name would be found instead of the original - so no later run decodes it again. A rotation older than the file it came from is thrown away, which is what happens when art is re-downloaded or replaced by hand. | P3 | S |
+| 3.5 | **DONE** - An image is called what it is. Every image route answered `image/jpeg` whatever it was sending, so a `.webp` set tile went out mislabelled - browsers sniff, so it drew, but nothing else downstream could trust the header. A cache entry is now a `CachedImage` (bytes plus content type, the type sniffed from the bytes rather than the file name, since a download is named by whatever the card server claimed), and `handle_image_request`, `handle_sets_image` and the editor all serve what the entry says. The re-encode this item expected was really a decode, and it is §3.4 that removed it; what was left here was the label. The editor also stopped opening every image a second time to repeat a rotation `Cache` had already done. | P3 | S |
 
 ## 4. Playability
 
@@ -83,10 +83,16 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 
 ### Done so far
 
-§1.1 – §1.4, §1.6, §1.7, §1.9, §1.10 · §2.1 – §2.10 (all of Usability) · §3.1, §3.1a, §3.2 · §4.2, §4.6 · §5.6.
+§1.1 – §1.4, §1.6, §1.7, §1.9, §1.10 · §2.1 – §2.10 (all of Usability) · §3.1 – §3.5 (all of Performance) ·
+§4.2, §4.6 · §5.6.
 Partly: §5.2 (four of fourteen markers; §5.2a is the account of the other ten).
 
-Still open: §1.5, §1.8 · §3.3 – §3.5 · §4.1, §4.3 – §4.5, §4.7, §4.8 · §5.1, §5.3 – §5.5.
+The image cache carries its own tests now (`unit_test/test_image_cache.py`, run in CI beside the
+scripted cases): the budget and what falls out of it first, which images are opened at all, and what
+each one is called on the wire. They build their own pictures in a temp folder, so they need neither
+an `assets/` folder nor a network.
+
+Still open: §1.5, §1.8 · §4.1, §4.3 – §4.5, §4.7, §4.8 · §5.1, §5.3 – §5.5.
 The rest of §5.2 is the largest thing left, and §5.2a splits it into the three
 kinds of work it actually is. The exhaust and detach pair is the piece worth
 taking next, and it wants its own scripted cases before it starts: the current

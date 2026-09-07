@@ -116,6 +116,14 @@ class FileManager:
         return os.path.dirname(file_path)
 
     @staticmethod
+    def ModifiedTime(file_path: str) -> float:
+        """When a file was last written, or 0 when it is not there."""
+        try:
+            return os.path.getmtime(file_path)
+        except OSError:
+            return 0.0
+
+    @staticmethod
     def Exists(file_path: str) -> bool:
         return os.path.exists(file_path)
 

@@ -56,3 +56,6 @@ jobs:
 
       - name: Replay the scripted cases
         run: python -m unittest unit_test.test_scripted -v
+
+      - name: Check the image cache
+        run: python -m unittest unit_test.test_image_cache -v

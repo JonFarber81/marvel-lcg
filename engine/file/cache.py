@@ -1,6 +1,7 @@
 from core import *
 import asyncio
 import threading
+from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 import requests
 from engine.lib import ImageCreator, ImageLib
@@ -15,15 +16,88 @@ TEXTURE_FOLDER  = ConfigVariables.Folder('texture_folder', "./assets/textures/")
 CACHE_FOLDER    = ConfigVariables.Folder('cache_folder', "./assets/cache/")
 IMAGE_SERVERS   = ConfigVariables.ListStr('image_servers', [])
 IMAGE_WORKERS   = ConfigVariables.Int('image_workers', 8)
+IMAGE_CACHE_MB  = ConfigVariables.Int('image_cache_mb', 64)
 # `save_empty_image` is gone: generated stand-ins are no longer written to disk.
 BREAK_WHEN_LOAD_ONLINE_IMAGE = ConfigVariables.Bool('break_when_load_online_image', False)
 
+@dataclass(frozen=True)
+class CachedImage:
+    """One image as it will go out on the wire."""
+    data: bytes
+    content_type: str = 'image/jpeg'
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+class ImageMemory:
+    """The images served most recently, under a budget in bytes.
+
+    This used to be a plain dict, which meant every JPEG the server had ever
+    handed out stayed resident: one pass over the New Game screen is 154 MB of
+    card art, and nothing ever dropped any of it. The cache is here to save the
+    second serve of the same picture, and that is what a recency ordering keeps -
+    what a session is looking at now is a hand, a board and a set of tiles, not
+    the whole collection. Anything evicted is re-read from `assets/`, which is
+    cheap now that an image already portrait is neither decoded nor re-encoded.
+
+    Sized in bytes rather than in entries because entries are not alike: a card
+    is ~370 KB and a set tile is ~15 KB. `image_cache_mb` sets the budget and
+    defaults to 64, which is ~175 cards - several times what a game has on the
+    table; 0 or less means the old unlimited behaviour."""
+
+    def __init__(self) -> None:
+        self.entries: 'OrderedDict[str, CachedImage]' = OrderedDict()
+        self.size: int = 0
+        # Loads finish on pool threads while the event loop reads hits.
+        self.lock = threading.Lock()
+
+    @property
+    def budget(self) -> int:
+        """Read from config on each use, so a test can change it mid-run."""
+        return IMAGE_CACHE_MB.value * 1024 * 1024
+
+    def Get(self, card_id: str) -> 'CachedImage|None':
+        with self.lock:
+            entry = self.entries.get(card_id)
+            if entry is not None:
+                self.entries.move_to_end(card_id)
+            return entry
+
+    def Put(self, card_id: str, entry: 'CachedImage') -> None:
+        with self.lock:
+            old = self.entries.pop(card_id, None)
+            if old is not None:
+                self.size -= len(old)
+            self.entries[card_id] = entry
+            self.size += len(entry)
+            budget = self.budget
+            if budget <= 0:
+                return
+            # An image bigger than the whole budget still goes in - it was just
+            # asked for - and is simply the first thing out next time.
+            while self.size > budget and len(self.entries) > 1:
+                _, dropped = self.entries.popitem(last=False)
+                self.size -= len(dropped)
+
+    def Clear(self) -> None:
+        with self.lock:
+            self.entries.clear()
+            self.size = 0
+
+    def Stats(self) -> Tuple[int, int]:
+        """How many images are held, and how many bytes they take."""
+        with self.lock:
+            return len(self.entries), self.size
+
 class Cache:
 
-    cache: Dict[str, bytes] = {}
+    memory = ImageMemory()
     link_pic: Dict[str, str] = {}
-    # Ids currently served by a generated stand-in rather than real art.
-    placeholders: Set[str] = set()
+    # The stand-ins made this session, by id. They are held apart from the
+    # recency cache above rather than in it: a stand-in means no server had the
+    # card, and letting one fall out of memory would put that 3s-per-server
+    # question back on the next request for it. They are ~2 KB each.
+    placeholders: Dict[str, 'CachedImage'] = {}
 
     # Images are loaded on their own pool rather than on the executor every
     # other request handler hands its work to (`TaskManager.ToThread`). A cold
@@ -35,7 +109,7 @@ class Cache:
     # Guards `pool` and `pending` together: a caller that finds no pending load
     # creates the pool and the entry in one step.
     pool_lock = threading.RLock()
-    pending: Dict[str, 'Future[bytes]'] = {}
+    pending: Dict[str, 'Future[CachedImage]'] = {}
 
     # The art pack ships separately from the repo (install guide step 6).
     # `CheckAssets` fills these in at start-up; the menu reads them back.
@@ -70,8 +144,8 @@ class Cache:
         Cache.link_pic[card_id] = link_to_pic_id
 
     @staticmethod
-    def SetCache(card_id: str, data: bytes):
-        Cache.cache[card_id] = data
+    def SetCache(card_id: str, data: bytes, content_type: str='image/jpeg'):
+        Cache.memory.Put(card_id, CachedImage(data, content_type))
 
     @staticmethod
     def IsCardId(name: str) -> bool:
@@ -183,7 +257,74 @@ class Cache:
             Cache.pending.pop(card_id, None)
 
     @staticmethod
-    def LoadImageFuture(card_id: str) -> 'Future[bytes]':
+    def RotatedPath(card_id: str) -> str:
+        """Where the stood-up copy of a landscape image is kept.
+
+        Its own folder under the disk cache, not beside the original: the loader
+        looks in the image folders first, so a rotated file sharing the
+        original's name would either be found instead of it or never be found at
+        all, depending on which folder each landed in."""
+        return FileManager.JoinPath(FileManager.JoinPath(CACHE_FOLDER.value, "rotated"),
+                                    f"{card_id}.jpg")
+
+    @staticmethod
+    def ReadRotated(card_id: str, source_path: str) -> bytes|None:
+        """The saved rotation of this file, if it is there and not stale.
+
+        Stale means the original has been written since - a re-download, or a
+        player replacing the art by hand - in which case the rotation is of the
+        picture that used to be there and is thrown away."""
+        rotated_path = Cache.RotatedPath(card_id)
+        if not FileManager.Exists(rotated_path):
+            return None
+        if FileManager.ModifiedTime(rotated_path) < FileManager.ModifiedTime(source_path):
+            return None
+        with FileManager.OpenFile(rotated_path, read=True, bin=True) as file:
+            return file.Read()
+
+    @staticmethod
+    def WriteRotated(card_id: str, data: bytes) -> None:
+        """Keep a rotation so no later run has to decode the original again.
+
+        Rotating is the one path here that costs a decode and a re-encode, and
+        about one image in ten needs it. Failing to write is not worth reporting:
+        the game has the image it wanted, and the only loss is doing this again
+        next time."""
+        rotated_path = Cache.RotatedPath(card_id)
+        try:
+            FileManager.MakeDir(FileManager.GetDirName(rotated_path))
+            with FileManager.OpenFile(rotated_path, write=True, bin=True) as file:
+                file.Write(data)
+        except OSError as e:
+            Log.DebugInfo(CATEGORY_NAME, f"Could not save the rotated {card_id}: {e}")
+
+    @staticmethod
+    def ReadImageFile(card_id: str, file_path: str) -> 'CachedImage|None':
+        """One image off the disk, standing it up if it is lying down.
+
+        The common case never opens the file with Pillow at all: it is already
+        portrait, so its own bytes are served in their own format - a set tile
+        stays the `.webp` it is stored as, instead of being decoded on every cold
+        load and then called a JPEG on the way out."""
+        rotated = Cache.ReadRotated(card_id, file_path)
+        if rotated:
+            return CachedImage(rotated, 'image/jpeg')
+
+        with FileManager.OpenFile(file_path, read=True, bin=True) as file:
+            data = file.Read()
+        # An empty file is not an image; the caller falls through to the link and
+        # the servers rather than serving nothing.
+        if not data:
+            return None
+
+        image_data, was_rotated = ImageLib.RotateIfNeeded(data)
+        if was_rotated:
+            Cache.WriteRotated(card_id, image_data)
+            return CachedImage(image_data, 'image/jpeg')
+        return CachedImage(data, ImageLib.ContentTypeOf(data))
+
+    @staticmethod
+    def LoadImageFuture(card_id: str) -> 'Future[CachedImage]':
         """One in-flight load per card, however many callers ask for it at once.
 
         The board asks for the same art from several places in the same frame,
@@ -194,7 +335,7 @@ class Cache:
             pending = Cache.pending.get(card_id)
             if pending is not None:
                 return pending
-            future = Cache.Pool().submit(Cache.LoadImage, card_id)
+            future = Cache.Pool().submit(Cache.LoadImageData, card_id)
             Cache.pending[card_id] = future
             # A future that finished before this line runs the callback here, on
             # this thread, while the lock is still held - hence the RLock.
@@ -202,49 +343,58 @@ class Cache:
             return future
 
     @staticmethod
-    async def LoadImageAsync(card_id: str) -> bytes:
-        """`LoadImage` without holding a request thread while it works.
+    async def LoadImageAsync(card_id: str) -> 'CachedImage':
+        """`LoadImageData` without holding a request thread while it works.
 
-        An image already in memory - which is every image after the first time
-        it is served - answers from here, with no thread hop at all."""
+        An image still in memory - which is every image asked for twice inside
+        the cache budget - answers from here, with no thread hop at all."""
         card_id = card_id.lstrip("/")
-        data = Cache.cache.get(card_id)
-        if data is not None:
-            return data
+        entry = Cache.memory.Get(card_id)
+        if entry is not None:
+            return entry
         return await asyncio.wrap_future(Cache.LoadImageFuture(card_id))
 
     @staticmethod
-    def LoadImage(card_id: str) -> bytes:
+    def LoadImageData(card_id: str) -> 'CachedImage':
         # if url in ['enthralled_minion', 'minion', 'ultron_facedown_drone']:
         #     url = 'player'
         card_id = card_id.lstrip("/")
 
-        if card_id in Cache.cache:
-            return Cache.cache[card_id]
+        entry = Cache.memory.Get(card_id)
+        if entry is not None:
+            return entry
 
         assert card_id != "", f"{card_id=}"
         file_name = card_id
 
+        stand_in = Cache.placeholders.get(file_name)
+        if stand_in is not None:
+            return stand_in
+
         file_path = Cache.FindImagePath(file_name)
         if file_path:
-            with FileManager.OpenFile(file_path, read=True, bin=True) as file:
-                image_data = ImageLib.TryRotateImage(file.Read())
-            # An empty file is not an image; fall through to the link and the
-            # servers below rather than serving nothing.
-            if image_data:
-                Cache.SetCache(file_name, image_data)
-                return image_data
+            entry = Cache.ReadImageFile(file_name, file_path)
+            if entry is not None:
+                Cache.SetCache(file_name, entry.data, entry.content_type)
+                return entry
 
         if file_name in Cache.link_pic:
-            image_data = Cache.LoadImage(Cache.link_pic[file_name])
-            if image_data:
-                return image_data
+            entry = Cache.LoadImageData(Cache.link_pic[file_name])
+            if entry.data:
+                return entry
 
         data = Cache.DownloadImage(card_id)
         if data:
-            image_data = ImageLib.TryRotateImage(data)
-            Cache.SetCache(file_name, image_data)
-            return image_data
+            image_data, was_rotated = ImageLib.RotateIfNeeded(data)
+            if was_rotated:
+                # The download is on disk under its own name; keep the rotation
+                # beside it so the next run reads it back instead of decoding.
+                Cache.WriteRotated(file_name, image_data)
+                content_type = 'image/jpeg'
+            else:
+                content_type = ImageLib.ContentTypeOf(image_data)
+            Cache.SetCache(file_name, image_data, content_type)
+            return CachedImage(image_data, content_type)
 
         # raise Exception(f"Failed to load {file_name} from the internet")
         # A stand-in is never written to the image cache. On disk it is
@@ -253,7 +403,7 @@ class Cache:
         # the card appears on the image server. Holding it in memory is enough to
         # stop the same request hitting the network again this session.
         image_data = ImageCreator.CreateNoImage(card_id)
-        Cache.placeholders.add(file_name)
-        Cache.SetCache(file_name, image_data)
-        return image_data
+        stand_in = CachedImage(image_data)
+        Cache.placeholders[file_name] = stand_in
+        return stand_in
 
