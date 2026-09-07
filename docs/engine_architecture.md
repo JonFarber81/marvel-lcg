@@ -734,6 +734,13 @@ python main.py -test
 
 # Load specific scenario
 python main.py -on_startup_load_save_file save.json
+
+# Fill the image cache before playing, then exit. Walks `sets_info.json` to every
+# scenario and hero it lists and downloads the card art that is not already in
+# `assets/`, several at a time, so a first session is not spent waiting on the
+# card server one image at a time.
+python main.py -prefetch_images
+python main.py -prefetch_images -prefetch_workers 16
 ```
 
 ### launch.json
@@ -762,6 +769,8 @@ Create `launch.json` in the project root:
 | `test_all` | `false` | Run all tests |
 | `translate_file` | `""` | Translation JSON file |
 | `font` | `"cour.ttf"` | Font for placeholder images |
+| `prefetch_images` | `false` | Download every card image, then exit |
+| `prefetch_workers` | `8` | Downloads in flight during a prefetch |
 
 ---
 

@@ -42,3 +42,18 @@ You need to download the game to gain its `assets` folder from [itch.io](https:/
 ```
 py main.py
 ```
+
+## 8. Optional: fetch the card art up front
+
+Card faces the `assets` folder does not carry are downloaded from a card server
+the first time each one is shown, one request at a time, which is what makes a
+first session slow. This walks `sets_info.json` to every scenario and hero it
+lists and downloads all of it in one go instead, then exits:
+
+```
+py main.py -prefetch_images
+```
+
+It skips anything already in `assets`, so it is safe to re-run after an update,
+and `-prefetch_workers 16` will pull harder if your connection can take it.
+
