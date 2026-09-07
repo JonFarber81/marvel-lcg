@@ -1,6 +1,8 @@
 /.vscode/**
 **/*.pyc
 /public/js/**/*.js
+# Hand-written, not a tsc output: the pages load it before anything else.
+!/public/js/version_guard.js
 /public/js/**/*.js.map
 /assets
 /save_*.json
