@@ -727,6 +727,73 @@ let hero_gallery_ready
 let markHeroGalleryReady
 hero_gallery_ready = new Promise(resolve => { markHeroGalleryReady = resolve })
 
+/** What the New Game form was last set to, so the next visit opens on it.
+ *
+ * The checkbox cache beside this one (`form_cache_data`) is written straight
+ * from the form's own elements. A scenario tile and a hero slot are not form
+ * elements - they are a picture of a file that was fetched - so what is kept
+ * here is the file names behind them, and they are put back once the tiles and
+ * the gallery have been built. */
+const RecentPicks = {
+    KEY: 'recent_picks',
+    /** How many decks the gallery's "Recent" row holds. */
+    DECK_LIMIT: 8,
+
+    /** @returns {{scenario: string, set_key: string, heroes: Object.<string, string>, decks: string[]}} */
+    Read() {
+        const empty = {scenario: "", set_key: "", heroes: {}, decks: []}
+        try {
+            const text = localStorage.getItem(RecentPicks.KEY)
+            if( !text ) {
+                return empty
+            }
+            const data = JSON.parse(text)
+            return {
+                scenario: data.scenario || "",
+                set_key: data.set_key || "",
+                heroes: data.heroes || {},
+                decks: Array.isArray(data.decks) ? data.decks : [],
+            }
+        } catch (err) {
+            // A half-written or hand-edited entry is not worth an error on the
+            // page: start the next game from a clean form instead.
+            console.error("Error reading the recent picks:", err)
+            return empty
+        }
+    },
+
+    Write(data) {
+        try {
+            localStorage.setItem(RecentPicks.KEY, JSON.stringify(data))
+        } catch (err) {
+            console.error("Error saving the recent picks:", err)
+        }
+    },
+
+    /** @param {string} scenario scenario file name, without the extension
+     * @param {string} set_key the set tile it sits under */
+    SetScenario(scenario, set_key) {
+        const data = RecentPicks.Read()
+        data.scenario = scenario
+        data.set_key = set_key
+        RecentPicks.Write(data)
+    },
+
+    /** @param {Object.<number, string>} heroes deck file name per slot */
+    SetHeroes(heroes) {
+        const data = RecentPicks.Read()
+        data.heroes = {...heroes}
+        RecentPicks.Write(data)
+    },
+
+    /** @param {string} name deck file name, moved to the front of the row */
+    AddDeck(name) {
+        const data = RecentPicks.Read()
+        data.decks = [name, ...data.decks.filter(x => x != name)].slice(0, RecentPicks.DECK_LIMIT)
+        RecentPicks.Write(data)
+    },
+}
+
 /** Scenario JSON memo, so each scenario is fetched at most once.
  * @type {Object.<string, Promise<any>>} */
 let scenario_json_cache = {}
@@ -939,6 +1006,9 @@ async function createScenarios() {
                     loadScenario(e.value)
                     generateInputs(e0.target.dataset.package)
                     e.classList.add('click')
+                    // The set is kept beside the scenario: putting this back
+                    // means opening its tile first.
+                    RecentPicks.SetScenario(e.value, e0.target.dataset.package)
                 }
             })
             document.querySelectorAll('#set-images>div').forEach(e => {
@@ -1155,12 +1225,48 @@ async function createSets() {
     }
 }
 
+/** Put the last game's scenario and heroes back on the form.
+ *
+ * Runs last, once the tiles and the gallery exist: a scenario is restored by
+ * opening its set tile and clicking its button, which is the same path a player
+ * takes, so the encounter and modular defaults follow from it as usual. Anything
+ * that is no longer there - a deck file deleted, a scenario that only a custom
+ * folder had - is skipped without a word. */
+async function restoreRecentPicks() {
+    const recent = RecentPicks.Read()
+
+    if( recent.scenario && recent.set_key ) {
+        const tile = document.querySelector(
+            `#set-images > div.set[data-package="${CSS.escape(recent.set_key)}"]:not(.disable)`)
+        if( tile ) {
+            tile.click()
+            const button = Array.from(document.querySelectorAll('#set-content button'))
+                .find(e => e.value == recent.scenario && !e.disabled)
+            if( button ) {
+                button.click()
+            }
+        }
+    }
+
+    // Read the slots up front: filling one writes the map back, and this would
+    // otherwise be walking what it is rewriting.
+    const slots = {...recent.heroes}
+    for( const i of [1, 2, 3, 4] ) {
+        // Only a deck the gallery still lists: a name that is no longer there
+        // would just be a 404 in the console.
+        if( slots[i] && hero_deck_index[slots[i]] ) {
+            await setHeroFromGallery(slots[i], i)
+        }
+    }
+}
+
 (async () => {
     try {
         await createScenarios()
         await createSets()
         const buildHeroGallery = await hero_gallery_ready
         await buildHeroGallery()
+        await restoreRecentPicks()
         LoadProgress.Finish()
     } catch (err) {
         console.error(err)
@@ -1218,6 +1324,11 @@ async function createSets() {
              * one; an imported deck has no file name here.
              * @type {Object.<number, string>} */
             let hero_slot_files = {}
+
+            /** Every deck the gallery lists, keyed by file name, so the
+             * "Recent" row can be redrawn from a list of names alone.
+             * @type {Object.<string, {name: string, label: string, data: any, set_name: string}>} */
+            let hero_deck_index = {}
 
             /** The slot the gallery is currently choosing for. */
             let hero_gallery_slot = 1
@@ -1334,7 +1445,85 @@ async function createSets() {
                     name_div.removeAttribute('title')
                     delete hero_slot_files[i]
                 }
+                // `hero_slot_files` is the record of which deck is in which
+                // slot, and every path that changes a slot lands here; write it
+                // through so the next visit can put the same heroes back.
+                RecentPicks.SetHeroes(hero_slot_files)
                 markHeroGalleryInUse()
+            }
+
+            /** One deck's tile in the gallery.
+             * @param {{name: string, label: string, data: any, set_name: string}} deck */
+            function createHeroOption(deck) {
+                const {name, label, data, set_name} = deck
+                const deck_size = data['player_deck'] ? data['player_deck'].length : 0
+
+                const option = document.createElement('button')
+                option.type = "button"
+                option.className = "hero-option"
+                option.dataset.deck = name
+                option.dataset.search = `${label} ${name} ${set_name}`.toLowerCase()
+                option.title = [`${label} - ${deck_size} cards (${name}.json)`, set_name].filter(x => x).join("\n")
+                option.onclick = () => chooseHero(name)
+
+                const img = document.createElement('img')
+                img.src = get_name(data['hero'][0])
+                img.alt = label
+                option.appendChild(img)
+
+                const caption = document.createElement('span')
+                caption.className = "hero-option-name"
+                caption.textContent = label
+                option.appendChild(caption)
+
+                return option
+            }
+
+            /** One titled grid of decks, or null when none of them can be drawn.
+             * @param {string} title
+             * @param {{name: string, label: string, data: any, set_name: string}[]} decks */
+            function createHeroGallerySection(title, decks) {
+                const cards = document.createElement('div')
+                cards.className = "hero-gallery-section-cards"
+                for( const deck of decks ) {
+                    cards.appendChild(createHeroOption(deck))
+                }
+                if( !cards.children.length ) {
+                    return null
+                }
+
+                const section = document.createElement('div')
+                section.className = "hero-gallery-section"
+                const heading = document.createElement('h4')
+                heading.className = "hero-gallery-section-title"
+                heading.textContent = title
+                section.appendChild(heading)
+                section.appendChild(cards)
+                return section
+            }
+
+            /** Redraw the "Recent" row at the top of the gallery.
+             * Unlike the rest of the gallery this is rebuilt on every open,
+             * because choosing a hero changes it. A deck whose file is gone
+             * since - renamed, deleted - is simply not in the index, so it drops
+             * out of the row rather than drawing a broken tile. */
+            function renderRecentDecks() {
+                const body = document.getElementById('hero-gallery-body')
+                const old = document.getElementById('hero-gallery-recent')
+                if( old ) {
+                    old.remove()
+                }
+                const decks = RecentPicks.Read().decks
+                    .map(name => hero_deck_index[name])
+                    .filter(deck => deck)
+                if( !decks.length ) {
+                    return
+                }
+                const section = createHeroGallerySection("Recent", decks)
+                if( section ) {
+                    section.id = "hero-gallery-recent"
+                    body.prepend(section)
+                }
             }
 
             /** Outline the heroes already sitting in a slot. */
@@ -1345,12 +1534,29 @@ async function createSets() {
                 })
             }
 
+            /** Put one gallery deck into a slot.
+             * @param {string} name deck file name, without the extension
+             * @param {number} i
+             * @returns {Promise<boolean>} whether the deck loaded */
+            async function setHeroFromGallery(name, i) {
+                const data = await getHeroCached(name).catch(() => undefined)
+                if( !data ) {
+                    return false
+                }
+                // `SetHero` clears the slot's deck file - it cannot know where
+                // the JSON came from - so name it again afterwards.
+                SetHero(data, i)
+                hero_slot_files[i] = name
+                RecentPicks.SetHeroes(hero_slot_files)
+                markHeroGalleryInUse()
+                return true
+            }
+
             /** @param {string} name deck file name, without the extension */
             async function chooseHero(name) {
-                const data = await getHeroCached(name)
-                SetHero(data, hero_gallery_slot)
-                hero_slot_files[hero_gallery_slot] = name
-                markHeroGalleryInUse()
+                if( await setHeroFromGallery(name, hero_gallery_slot) ) {
+                    RecentPicks.AddDeck(name)
+                }
                 closeHeroGallery()
             }
 
@@ -1358,6 +1564,7 @@ async function createSets() {
             function openHeroGallery(i) {
                 hero_gallery_slot = i
                 document.getElementById('hero-gallery-title').textContent = `Choose the hero for player ${i}`
+                renderRecentDecks()
                 markHeroGalleryInUse()
                 const dialog = document.getElementById('hero-gallery')
                 if( dialog.showModal ) {
@@ -1476,7 +1683,9 @@ async function createSets() {
                 const body = document.getElementById('hero-gallery-body')
                 body.replaceChildren()
                 for( const group of groups ) {
-                    /** @type {{name: string, label: string, data: any}[]} */
+                    /** `set_name` is filled in below, once the labels are
+                     * settled and the decks go into the index.
+                     * @type {{name: string, label: string, data: any, set_name?: string}[]} */
                     const decks = []
                     for( const name of group.names ) {
                         const data = await getHeroCached(name).catch(() => undefined)
@@ -1506,43 +1715,15 @@ async function createSets() {
                         deck.label = `${deck.label} (${rest.replaceAll('_', ' ')})`
                     }
 
-                    const cards = document.createElement('div')
-                    cards.className = "hero-gallery-section-cards"
-                    for( const {name, label, data} of decks ) {
-                        const deck_size = data['player_deck'] ? data['player_deck'].length : 0
-                        const set_name = set_of[name] || ""
-
-                        const option = document.createElement('button')
-                        option.type = "button"
-                        option.className = "hero-option"
-                        option.dataset.deck = name
-                        option.dataset.search = `${label} ${name} ${set_name}`.toLowerCase()
-                        option.title = [`${label} - ${deck_size} cards (${name}.json)`, set_name].filter(x => x).join("\n")
-                        option.onclick = () => chooseHero(name)
-
-                        const img = document.createElement('img')
-                        img.src = get_name(data['hero'][0])
-                        img.alt = label
-                        option.appendChild(img)
-
-                        const caption = document.createElement('span')
-                        caption.className = "hero-option-name"
-                        caption.textContent = label
-                        option.appendChild(caption)
-
-                        cards.appendChild(option)
+                    for( const deck of decks ) {
+                        deck.set_name = set_of[deck.name] || ""
+                        hero_deck_index[deck.name] = deck
                     }
-                    if( !cards.children.length ) {
+
+                    const section = createHeroGallerySection(group.title, decks)
+                    if( !section ) {
                         continue
                     }
-
-                    const section = document.createElement('div')
-                    section.className = "hero-gallery-section"
-                    const title = document.createElement('h4')
-                    title.className = "hero-gallery-section-title"
-                    title.textContent = group.title
-                    section.appendChild(title)
-                    section.appendChild(cards)
                     body.appendChild(section)
                 }
 
@@ -2757,6 +2938,9 @@ p:has(#timeout_text) {
     if (clearCacheBtn) {
         clearCacheBtn.addEventListener('click', () => {
             localStorage.removeItem(CACHE_KEY);
+            // "Reset to default" has to mean the whole form, so the last
+            // scenario and heroes go with the checkboxes.
+            localStorage.removeItem(RecentPicks.KEY);
             // Reload the page to show a clean form
             window.location.reload(); 
         });

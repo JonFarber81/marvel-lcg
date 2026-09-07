@@ -21,6 +21,7 @@ PRINT_MY_USER_FINGERPRINT           = ConfigVariables.Bool('print_my_user_finger
 
 DEVICE              = ConfigVariables.Str('device', "web")
 REHASH              = ConfigVariables.Bool('rehash', False)
+PREFETCH_IMAGES     = ConfigVariables.Bool('prefetch_images', False)
 
 PROFILE_FOLDER      = ConfigVariables.Folder('profile_folder')
 TEST_ALL            = ConfigVariables.Bool('test_all', False)
@@ -60,6 +61,14 @@ class Engine:
 
             from engine.file import Cache
             Cache.CheckAssets()
+
+            if PREFETCH_IMAGES.value:
+                # Fill the image cache and stop. Nothing else has to be running
+                # for it, and a first session then opens on art it already has
+                # instead of waiting on a card server a request at a time.
+                from engine.file import ImagePrefetch
+                ImagePrefetch.Run()
+                return False
 
             JobManager.Initialize()
             TaskManager.Initialize()

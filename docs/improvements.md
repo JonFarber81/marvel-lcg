@@ -35,8 +35,8 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 | 2.6 | **DONE** - The replay test runner falls back to the config that ships. `unit_test/test_all.py` passes `-config_files launch-debug.json launch.json`, and `FileManager.FindJsonPath` takes the first that exists, so a plain checkout no longer opens with `File ('launch-debug.json',) not found`; a maintainer's own `launch-debug.json` still wins, and it is now in `.gitignore` so it stays personal. These tests still need a `./replays/` corpus, which is not in the repo - the checked-in regression net is `unit_test/cases` (§5.6). | P2 | S |
 | 2.7 | **DONE** - The environment switch is live and the shipped default is unchanged. `Build.release` is `EnvFlag("RELEASE") or not EnvFlag("DEBUG")`: a plain `py main.py` is still a release build, `DEBUG=1` opts into the debug build (call and instance trackers, coverage, every assert behind `if not Build.release`), and `RELEASE=1` wins over `DEBUG` so a shell exporting one can still start the other. `0`, `false`, `off`, `no` and empty all read as off. The version banner says which you got (`0.5.9.201r` / `...d`). | P3 | S |
 | 2.8 | **DONE** - `.gitignore` carries `/venv/` and `/.venv/` (commit `897098b`), anchored at the repo root, so a local virtualenv no longer shows up in `git status`. Nothing under either path is tracked. §2.6 added `/launch-debug.json` beside them, for the same reason. | P3 | S |
-| 2.9 | **Deck picker has no "recent decks".** The New Game form already persists checkboxes in `localStorage` (`CACHE_KEY`); extend that to the last-used scenario and hero files. | P2 | S |
-| 2.10 | **Image prefetch command.** Offer `py main.py --prefetch-images` (or a menu button) that walks `sets_info.json` → scenario JSON → villain/hero IDs and fills `assets/cache` with a concurrency limit, so the first session isn't spent waiting on cerebro. | P2 | M |
+| 2.9 | **DONE** - The New Game screen opens on the last game's picks. The checkbox cache (`form_cache_data`) is written from the form's own elements, and a scenario tile and a hero slot are not form elements, so `RecentPicks` (`public/scene.html`) keeps the file names behind them under `recent_picks` instead: the scenario, the set tile it sits under, the deck in each slot, and the last 8 decks chosen. They are put back after the load burst, by opening the tile and clicking the scenario button - the same path a player takes, so the encounter and modular defaults follow as usual. The last 8 decks also draw a "Recent" row at the top of the hero gallery, rebuilt on each open because choosing a hero changes it. A deck whose file is gone since is skipped rather than reported, an imported deck records nothing (there is no file behind it), and "Reset to default" clears this alongside the checkboxes. | P2 | S |
+| 2.10 | **DONE** - `py main.py -prefetch_images` fills the image cache and exits. It walks `sets_info.json` to every scenario (standard and expert), every encounter and modular set those name, and every hero deck, reading card ids by shape rather than by key name so a two-faced "front,back" entry gives both; 3,462 cards on the current data. What `assets/` already holds is skipped, and the rest is downloaded through a thread pool (`prefetch_workers`, 8 by default, ~14 cards/second on a home line), with a progress line every 50 and a closing count of what no server had. `Cache` grew the two seams this needed - `FindImagePath` and `DownloadImage`, the latter safe to call from a worker thread - and `LoadImage` is now written in terms of them. Documented as install-guide step 8. | P2 | M |
 
 ## 3. Performance
 
@@ -79,3 +79,11 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 2. ~~§1.3, §1.4~~ — **done** (progress bar, hero gallery); §4.2 — resume.
 3. ~~§5.6~~ — **done** (the regression net); §5.2 is now safe to start, and every step of it should be run against `python -m unittest unit_test.test_scripted`.
 4. §4.4 — the remaining large playability investment (~~§4.6~~ **done**).
+
+### Done so far
+
+§1.1, §1.2, §1.3, §1.4, §1.6, §1.7, §1.9 · §2.1 – §2.10 (all of Usability) · §3.1, §3.1a · §4.6 · §5.6.
+
+Still open: §1.5, §1.8, §1.10 · §3.2 – §3.5 · §4.1 – §4.5, §4.7, §4.8 · §5.1 – §5.5.
+§3.2 is the next one worth taking: §2.10 now downloads the same images through a
+thread pool, so the pieces it needs are already there.
