@@ -21,7 +21,7 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 | 1.7 | **DONE** - A stale page is told so in its own language. `WebServer.VersionMismatchResponse` answers `409 {"error": "version_mismatch", "version": ...}` when the caller sent `Accept: application/json` or any `X-Requested-With`, and the mismatch page otherwise, so the address bar still gets the page that explains itself. `public/js/version_guard.js` supplies the header on every same-origin `fetch` and, on that 409, reloads the page - the reload is a navigation, so it lands on the mismatch page. Loaded first by every page that talks to the server. | P2 | S |
 | 1.8 | **No accessibility attributes anywhere** (zero `aria-` / `role=` hits in `public/`). Tiles and card buttons are `<div>`/`<button>` with images and no text alternative. Add `alt` (card name) and `aria-label`; make tiles keyboard-focusable. | P3 | M |
 | 1.9 | **DONE** - The zoom lock is scoped to the board. `marvel.html` still ships `user-scalable=0, maximum-scale=1` so a two-finger gesture on the scene stays a camera drag, but `js/marvel/viewport.ts` rewrites the meta to a zoomable one while a panel of text is up — the menu/log (`HistoryLog.toggle`) and the game-over statistics (`Game.setGameOver`) — and restores the lock when the board is back in front. Panels are reference-counted, so closing one does not re-lock while the other is still open. | P3 | S |
-| 1.10 | **Main menu has no "Continue".** `AUTO_SAVE_AFTER_GAME_OVER` exists but there is no resume path from `main.html`. Pair with §4.2. | P2 | M |
+| 1.10 | **DONE** - with §4.2, which is where the Continue button and the autosave behind it are described. | P2 | M |
 
 ## 2. Usability
 
@@ -54,7 +54,7 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 | # | Item | Pri | Eff |
 |---|------|-----|-----|
 | 4.1 | **Random hero / random scenario.** `random_modular()` exists for modulars; add "Random hero" and "Random scenario" buttons for quick solo games. The gallery half of this item shipped with §1.4, so the buttons now have a list to pick from. | P2 | S |
-| 4.2 | **Autosave & resume.** `GameSession.SaveScene` and `LoadScene` (`game_run/game_session.py`) already exist; autosave at each villain-phase end and expose "Continue last game" on the main menu. | P1 | M |
+| 4.2 | **DONE** - The game is saved as it goes, and the menu offers it back. `GameSession.AutoSave` writes the scene to one slot (`auto_save_file`, `./saves/autosave.json`) at the end of every villain phase - the one moment in a round where nothing is half-resolved: the round's cards are dealt and revealed and no player has been asked anything. A save is the recipe plus the inputs that got there, so the slot is an ordinary replay file; `Continue` loads it with `skip_to = -1`, the "to the end" form `InitializeSkip` already read for a load, which replays every input and then hands the game back to the player. The slot is skipped during a replay, a puzzle, a test and the fast-forward of a load (all of which pass villain phases the player is not living through), and cleared when a game actually ends, so the menu never offers a game that is already over. `#continue-btn` on the main menu names what it will resume - "Spider-Man vs Rhino - saved at the end of round 1" - from `/get_autosave_status`, and is simply absent when the slot is empty. This is also §1.10. | P1 | M |
 | 4.3 | **Surface undo depth.** `GameSession.Undo(n)` (`game_session.py:194`) is implemented server-side. If the client only exposes single-step undo, add an undo-N control with a short history list. | P2 | S |
 | 4.4 | **Campaign mode beyond Red Skull.** `mode_campaign` is gated to "The Rise of Red Skull". The Galaxy's Most Wanted, Mad Titan's Shadow, Sinister Motives, Mutant Genesis, NeXt Evolution, Age of Apocalypse and Civil War sets are all present; extend the campaign log to them one box at a time. | P2 | L |
 | 4.5 | **Per-scenario win record on tiles.** `/get_completion_rate` and `game/rule/statistics.py` exist; show wins/plays and best hero on each scenario button. | P3 | S |
@@ -76,14 +76,14 @@ Priority: **P1** = players hit it in a normal session · **P2** = noticeable fri
 ## 6. Suggested order
 
 1. ~~§2.1, §2.2, §1.2, §3.1~~ — **done** (plus §3.1a, a latent race the speedup uncovered).
-2. ~~§1.3, §1.4~~ — **done** (progress bar, hero gallery); §4.2 — resume.
+2. ~~§1.3, §1.4, §4.2~~ — **done** (progress bar, hero gallery, autosave and resume).
 3. ~~§5.6~~ — **done** (the regression net); §5.2 is now safe to start, and every step of it should be run against `python -m unittest unit_test.test_scripted`.
 4. §4.4 — the remaining large playability investment (~~§4.6~~ **done**).
 
 ### Done so far
 
-§1.1, §1.2, §1.3, §1.4, §1.6, §1.7, §1.9 · §2.1 – §2.10 (all of Usability) · §3.1, §3.1a, §3.2 · §4.6 · §5.6.
+§1.1 – §1.4, §1.6, §1.7, §1.9, §1.10 · §2.1 – §2.10 (all of Usability) · §3.1, §3.1a, §3.2 · §4.2, §4.6 · §5.6.
 
-Still open: §1.5, §1.8, §1.10 · §3.3 – §3.5 · §4.1 – §4.5, §4.7, §4.8 · §5.1 – §5.5.
-§4.2 is the next one worth taking: it is the open half of step 2 below, and
-§1.10 is the menu entry that finishes it.
+Still open: §1.5, §1.8 · §3.3 – §3.5 · §4.1, §4.3 – §4.5, §4.7, §4.8 · §5.1 – §5.5.
+§5.2 is the next one worth taking: it is the last P1 open, and the scripted
+regression net (§5.6) is what makes it safe to start.

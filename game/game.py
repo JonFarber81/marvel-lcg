@@ -97,6 +97,10 @@ class Game:
         assert self.world
         if not self.world.game_over.is_game_exit_or_undo:
             self.world.OnGameOver(self.world.game_over)
+            # This game is finished, so the autosave slot no longer holds a game
+            # to go back to. Leaving it would have the menu offer a Continue
+            # that replays to the losing move and stops there.
+            self.session.ClearAutoSave()
 
         if not self.state.IsRunningNewGame():
             self.controller_manager.OnGameOver()

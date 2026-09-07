@@ -19,6 +19,16 @@ class GameServerNewGame(GameServerBase):
         self.game.NewGame(new_game)
         return web.json_response({'result': "New game created"})
 
+    async def continue_game(self, request: web.Request) -> web.Response:
+        """Resume the autosave slot - the main menu's Continue button.
+
+        Answers 404 when there is nothing in the slot, so a menu drawn before
+        the last game ended says so rather than opening an empty board."""
+        if not self.game.session.LoadAutoSave():
+            return web.json_response({'error': "No game to continue"}, status=404)
+        self.controller_manager.OnNewGame()
+        return web.json_response({'result': "Game continued"})
+
     async def load_replay(self, request: web.Request) -> web.Response:
         self.game.LoadReplay(request.rel_url.query_string)
         return web.json_response({'result': "New game created"})
@@ -154,6 +164,7 @@ class GameServerNewGame(GameServerBase):
         super().__init__()
         self.AddAwaitGetSecurity('/new', self.new_game)
         self.AddAwaitGetSecurity('/new_debug', self.new_debug)
+        self.AddAwaitGetSecurity('/continue_game', self.continue_game)
         self.AddAwaitGetSecurity('/load_replay', self.load_replay)
         self.AddPostSecurity('/load_replay_data', self.load_replay_data)
         self.AddAwaitGetSecurity('/save_replay_data', self.save_replay_data)

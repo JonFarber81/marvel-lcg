@@ -143,6 +143,32 @@
             background: rgb(161, 129, 0);
         }
 
+        /* Continue is the one button that is not always there - it appears only
+           when the autosave slot holds an unfinished game - so it is coloured
+           apart from the rest rather than sitting in the row unremarked. */
+        .continue-btn {
+            background: rgb(0, 158, 96);
+            background: linear-gradient(0deg, rgba(0, 158, 96, 1) 0%, rgba(0, 122, 74, 1) 100%);
+        }
+
+        .continue-btn:before,
+        .continue-btn:after {
+            background: rgba(0, 122, 74, 1);
+        }
+
+        #continue-detail {
+            display: none;
+            margin: .8rem auto 0;
+            max-width: 32rem;
+            color: rgb(160, 160, 160);
+            font-size: .9rem;
+            line-height: 1.5;
+        }
+
+        #continue-detail.show {
+            display: block;
+        }
+
         /* Shown only when the downloaded art pack is missing. Nothing else on
            the page says so: the game runs, it just draws every card itself. */
         #assets-banner {
@@ -203,6 +229,9 @@
         </style>
 
         <div class="main">
+            <button id="continue-btn" class="custom-btn btn-3 continue-btn" style="display: none;" onclick="doContinue()">
+                <span>Continue</span>
+            </button>
             <button class="custom-btn btn-3" onclick="Open('scene')">
                 <span>New Game</span>
             </button>
@@ -225,6 +254,8 @@
                 <span>Credits</span>
             </button>
         </div>
+
+        <div id="continue-detail"></div>
 
         <!-- <hr/>
 
@@ -286,6 +317,62 @@
                 + `(install guide step 6), then restart.`
             banner.classList.add('show')
             document.body.classList.add('has-assets-banner')
+        })()
+    </script>
+
+    <script>
+        /** The game autosaves at the end of every villain phase (improvements
+         * 4.2), into one slot. When that slot holds an unfinished game the menu
+         * grows a Continue button that says which game it is - there is no
+         * other way back into it, and a menu that offered "Continue" with
+         * nothing behind it would be worse than none. */
+        function doContinue() {
+            const button = document.getElementById('continue-btn')
+            button.disabled = true
+            fetch('continue_game').then(response => {
+                if( !response.ok ) {
+                    // The game finished in another tab while this menu sat open.
+                    button.style.display = 'none'
+                    document.getElementById('continue-detail').classList.remove('show')
+                    button.disabled = false
+                    return
+                }
+                window.location.href = '.?hot_seat&3d_scene'
+            }).catch(() => {
+                button.disabled = false
+            })
+        }
+
+        (async () => {
+            let status
+            try {
+                const response = await fetch('get_autosave_status')
+                if( !response.ok ) {
+                    return
+                }
+                status = await response.json()
+            } catch( err ) {
+                // An older server has no such route; the menu is the same
+                // without the button.
+                return
+            }
+            if( !status || !status.exists ) {
+                return
+            }
+
+            document.getElementById('continue-btn').style.display = ''
+
+            const heroes = (status.names || []).join(', ')
+            const scenario = status.scenario + (status.expert ? ' (Expert)' : '')
+            const round = status.round > 0 ? `round ${status.round}` : 'the first round'
+            const detail = document.getElementById('continue-detail')
+            detail.textContent = heroes
+                ? `${heroes} vs ${scenario} - saved at the end of ${round}.`
+                : `${scenario} - saved at the end of ${round}.`
+            if( status.time ) {
+                detail.textContent += ` Started ${status.time}.`
+            }
+            detail.classList.add('show')
         })()
     </script>
 
