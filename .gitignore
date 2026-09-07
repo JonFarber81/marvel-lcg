@@ -10,5 +10,6 @@
 /crash.log
 /statistics.json
 /deck/*.json
+/launch-debug.json
 /venv/
 /.venv/
