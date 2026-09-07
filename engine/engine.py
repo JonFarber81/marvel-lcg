@@ -58,6 +58,9 @@ class Engine:
                 CardsDB.Rehash()
                 return False
 
+            from engine.file import Cache
+            Cache.CheckAssets()
+
             JobManager.Initialize()
             TaskManager.Initialize()
 

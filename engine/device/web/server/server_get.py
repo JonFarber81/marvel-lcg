@@ -158,6 +158,18 @@ class GameServerGet(GameServerBase):
         assert file
         return self.ReadReplayFile(file)
 
+    async def get_assets_status(self, request: web.Request) -> web.Response:
+        """What the main menu needs to say the art pack is missing.
+
+        The check itself ran at start-up (`Cache.CheckAssets`); this only hands
+        the answer to the page, so the menu never touches the disk."""
+        from engine.file import Cache
+        return web.json_response({
+            "missing": Cache.assets_missing,
+            "folder": Cache.assets_folder,
+            "url": Cache.ASSETS_URL,
+        })
+
     async def get_gamers(self, request: web.Request) -> web.Response:
         if self.controller_manager.game.state.is_running:
             num = str(self.controller_manager.total_players)
@@ -193,6 +205,8 @@ class GameServerGet(GameServerBase):
         self.AddAwaitGetSecurity('/get_max_timeout', self.get_max_timeout)
         self.AddAwaitGetSecurity('/get_puzzle_json', self.get_puzzle_json)
         self.AddAwaitGetSecurity('/get_replay_json', self.get_replay_json)
+
+        self.AddAwaitGetSecurity('/get_assets_status', self.get_assets_status)
 
         self.AddAwaitGetSecurity('/get_gamers', self.get_gamers)
 

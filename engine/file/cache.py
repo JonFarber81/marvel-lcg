@@ -21,6 +21,30 @@ class Cache:
     # Ids currently served by a generated stand-in rather than real art.
     placeholders: Set[str] = set()
 
+    # The art pack ships separately from the repo (install guide step 6).
+    # `CheckAssets` fills these in at start-up; the menu reads them back.
+    assets_missing: bool = False
+    assets_folder: str = ""
+
+    ASSETS_URL = "https://irefrixs.itch.io/marvel-lcg"
+
+    @staticmethod
+    def CheckAssets() -> bool:
+        """Whether the downloaded art pack is in place.
+
+        Without it nothing fails: every card falls back to a generated stand-in,
+        so an install that skipped step 6 just looks like a game whose art is
+        grey, and the reason is nowhere on screen. Say it once here instead, and
+        leave the answer where the main menu can repeat it."""
+        Cache.assets_folder = FileManager.JoinPath(TEXTURE_FOLDER.value, "sets")
+        Cache.assets_missing = not FileManager.IsDir(Cache.assets_folder)
+        if Cache.assets_missing:
+            Log.Warn(CATEGORY_NAME,
+                     f"{Cache.assets_folder} is not there, so every card will be drawn as a "
+                     f"stand-in. Download the game from {Cache.ASSETS_URL} and put its `assets` "
+                     "folder in the project root - install guide step 6.")
+        return not Cache.assets_missing
+
     @staticmethod
     def IsPlaceholder(card_id: str) -> bool:
         return card_id.lstrip("/") in Cache.placeholders
