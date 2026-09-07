@@ -30,6 +30,86 @@ class AbilityFactoryDeck:
         )
 
     @staticmethod
+    def WhenDeckWouldShuffle(ability_type: 'AbilityType',
+                        deck: Callable[['Effect'], 'Deck']|Callable[['Effect'], List['Deck']],
+                        operation: OperationType[Message.WhenDeckWouldShuffle],
+                        *,
+                        conditions: ConditionsType[Message.WhenDeckWouldShuffle]=[],
+                        ) -> 'Ability':
+        """Before the shuffle, where `message.SetBeInstead(effect)` replaces it."""
+
+        def check_deck(effect: 'Effect', message: 'Message.WhenDeckWouldShuffle') -> bool:
+            the_deck = deck(effect)
+            if isinstance(the_deck, list):
+                return message.deck in the_deck
+            else:
+                return the_deck == message.deck
+
+        return Ability(
+            ability_type,
+            Message.WhenDeckWouldShuffle,
+            [
+                check_deck,
+                *conditions
+            ],
+            operation,
+        )
+
+    @staticmethod
+    def WhenDeckWouldRunOut(ability_type: 'AbilityType',
+                        deck: Callable[['Effect'], 'Deck'],
+                        operation: OperationType[Message.WhenDeckWouldRunOut],
+                        *,
+                        conditions: ConditionsType[Message.WhenDeckWouldRunOut]=[],
+                        ) -> 'Ability':
+        """Before the deck is announced empty. Standing in here also stands in
+        for the reshuffle `AfterDeckRunOut` sets off."""
+
+        def check_deck(effect: 'Effect', message: 'Message.WhenDeckWouldRunOut') -> bool:
+            return deck(effect) == message.deck
+
+        return Ability(
+            ability_type,
+            Message.WhenDeckWouldRunOut,
+            [
+                check_deck,
+                *conditions
+            ],
+            operation,
+        )
+
+    @staticmethod
+    def WhenDeckWouldReset(ability_type: 'AbilityType',
+                        deck: Callable[['Effect'], 'Deck']|None,
+                        operation: OperationType[Message.WhenDeckWouldReset],
+                        *,
+                        conditions: ConditionsType[Message.WhenDeckWouldReset]=[],
+                        is_player_deck: bool|None=None,
+                        ) -> 'Ability':
+        """Before the reset and its penalty, so both can be replaced together."""
+
+        def check_deck(effect: 'Effect', message: 'Message.WhenDeckWouldReset') -> bool:
+            if deck == None:
+                return True
+            return deck(effect) == message.deck
+
+        def check_is_player_deck(effect: 'Effect', message: 'Message.WhenDeckWouldReset') -> bool:
+            if is_player_deck == None:
+                return True
+            return is_player_deck == message.deck.flags.is_player_deck
+
+        return Ability(
+            ability_type,
+            Message.WhenDeckWouldReset,
+            [
+                check_deck,
+                check_is_player_deck,
+                *conditions
+            ],
+            operation,
+        )
+
+    @staticmethod
     def AfterDeckRunOut(ability_type: 'AbilityType',
                         deck: Callable[['Effect'], 'Deck'],
                         operation: OperationType[Message.AfterDeckRunOut],

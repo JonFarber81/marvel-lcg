@@ -507,8 +507,11 @@ class Card(Object):
         area_before_shuffle = self.area
 
         if need_shuffle:
-            after_deck_runout = Message.AfterDeckRunOut(from_area)
-            after_deck_runout.Send()
+            would_runout = Message.WhenDeckWouldRunOut(from_area)
+            would_runout.Send()
+            if not would_runout.is_be_instead:
+                after_deck_runout = Message.AfterDeckRunOut(from_area, would_runout)
+                after_deck_runout.Send()
 
         if into_area.flags.is_in_hand:
             enter_hand_message = Message.AfterCardEnterHand(up_face, from_area, into_area, by_effect)

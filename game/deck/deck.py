@@ -143,9 +143,17 @@ class Deck2(Generic[TC], Object):
     def Unshuffle(self, by_effect: 'Effect'):
         self.cards = self.for_undo_shuffle[:]
 
-    def ShuffleInternal(self, by_effect: 'Effect', only_for_most_top: int|None):
+    def ShuffleInternal(self, by_effect: 'Effect', only_for_most_top: int|None) -> bool:
         from game.operate.rand import Rand
         from game.message import Message
+
+        would_message = Message.WhenDeckWouldShuffle(self, self.bind_discard_pile)
+        would_message.Send()
+        if would_message.is_be_instead:
+            # Something stood in for the shuffle. The order is left as it is -
+            # no cards are drawn against it here - and no `AfterDeckShuffle`
+            # goes out, so nothing that waits on a shuffle sees one.
+            return False
 
         self.CleanAllCardsStatuesInternal()
         if only_for_most_top != None:
@@ -156,8 +164,9 @@ class Deck2(Generic[TC], Object):
             Rand.Shuffle(self.cards, by_effect)
         self.UpdateAllCardsStatuesInternal()
 
-        message = Message.AfterDeckShuffle(self, self.bind_discard_pile)
+        message = Message.AfterDeckShuffle(self, self.bind_discard_pile, would_message)
         message.Send()
+        return True
 
     def Shuffle(self, by_effect: 'Effect', only_for_most_top: int|None=None) -> None:
         self.for_undo_shuffle = self.cards[:]
@@ -175,9 +184,16 @@ class Deck2(Generic[TC], Object):
 
             if penalty:
                 assert self.bind_discard_pile
-                self.process_after_shuffle(self, by_effect)
-                reset_message = Message.AfterDeckReset(self)
-                reset_message.Send()
+                would_reset_message = Message.WhenDeckWouldReset(self)
+                would_reset_message.Send()
+                if not would_reset_message.is_be_instead:
+                    # `process_after_shuffle` is the reset penalty itself - an
+                    # encounter card for a player deck, an acceleration token
+                    # for the encounter deck - so an effect that stands in for
+                    # the reset stands in for the penalty with it.
+                    self.process_after_shuffle(self, by_effect)
+                    reset_message = Message.AfterDeckReset(self, would_reset_message)
+                    reset_message.Send()
         else:
             self.Shuffle(by_effect)
 

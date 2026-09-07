@@ -688,14 +688,31 @@ class SenderDamage:
                 self.Present(text, "banished", effect.this)
             pass
 
-    # TODO: Pre message
-    class AfterDamageBePrevented(TriggerUnitMessage):
-        def __init__(self, who_not_take_damage: 'Unit2', damage: int, property: DamageProperty, effect: 'Effect', would_atk_message: 'Message.WhenUnitWouldAttack|None') -> None:
+    class WhenDamageWouldBePrevented(TriggerUnitMessage, CanBeInstead, HasEndEventMessage):
+        """Before damage is prevented, so "this damage cannot be prevented" has
+        somewhere to stand.
+
+        `prevent_damage` is the amount as it was asked for, so "All" is still
+        "All" here - nothing has been worked out or recorded against the unit
+        yet, which is the point of sending it before rather than after."""
+        def __init__(self, who_not_take_damage: 'Unit2', damage: 'int|Literal["All"]', property: DamageProperty, effect: 'Effect', would_atk_message: 'Message.WhenUnitWouldAttack|None') -> None:
+            from game.message import Message
             self.would_atk_message: Final = would_atk_message
             self.prevent_by_effect: Final = effect
             self.property: Final = property
             self.prevent_damage: Final = damage
-            super().__init__(trigger=who_not_take_damage)
+            super().__init__(trigger=who_not_take_damage, end_event=Message.AfterDamageBePrevented)
+
+        def IsFromAttack(self) -> bool:
+            return self.would_atk_message != None
+
+    class AfterDamageBePrevented(TriggerUnitMessage, HasPreEventMessage):
+        def __init__(self, who_not_take_damage: 'Unit2', damage: int, property: DamageProperty, effect: 'Effect', would_atk_message: 'Message.WhenUnitWouldAttack|None', message: 'Message.WhenDamageWouldBePrevented') -> None:
+            self.would_atk_message: Final = would_atk_message
+            self.prevent_by_effect: Final = effect
+            self.property: Final = property
+            self.prevent_damage: Final = damage
+            super().__init__(trigger=who_not_take_damage, pre_message=message)
             text = TransText("Prevented {damage} of this damage ({effect})", damage=damage, effect=effect.this)
             self.Present(text, "banished", who_not_take_damage, effect.this)
 
@@ -805,14 +822,20 @@ class SenderDamage:
 
         def PreventDamage(self, value: int|Literal["All"], by_effect: 'Effect') -> int:
             from game.message import Message
+            would_message = Message.WhenDamageWouldBePrevented(self.trigger, value, self.property, by_effect, self.would_atk_message)
+            would_message.Send()
+            if would_message.is_be_instead:
+                # Nothing has been recorded against the unit yet, so refusing
+                # here leaves the damage exactly as it was: no prevention, and
+                # `be_prevent` untouched.
+                return 0
             if value == "All":
                 prevent_damage = self.PreventAllDamageInternal()
             else:
                 assert value > 0
                 prevent_damage = value
                 self.total_prevent_damage += value
-            from game.message import Message
-            message = Message.AfterDamageBePrevented(self.trigger, prevent_damage, self.property, by_effect, self.would_atk_message)
+            message = Message.AfterDamageBePrevented(self.trigger, prevent_damage, self.property, by_effect, self.would_atk_message, would_message)
             message.Send()
             return prevent_damage
 
