@@ -1,0 +1,2160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rhino — Marvel Champions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   Tokens — the set the menu and the setup screen use, plus what a table needs
+   that a menu does not.
+
+   The board has one line through it. Above it is the villain's country and it
+   is warm; below it is yours and it is cool. With two heroes at the table the
+   lower half is two countries, one per seat, and each keeps its own cool
+   colour. Warm is always the encounter side and never anything else.
+
+   Aspect colours are deliberately absent. On the setup screen an aspect is
+   what you are choosing, so it earns a colour; here it is a fact about a deck
+   you already brought, and the board's colour has one job — whose is this.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --ink:#0B0C11;
+  --panel:#13151D;
+  --panel-2:#1A1D27;
+  --panel-3:#232733;
+  --rule:#282D3A;
+  --rule-soft:#1E222C;
+  --text:#E9EBF1;
+  --dim:#A2A8BA;
+  --muted:#767D92;
+  --faint:#4E5568;
+
+  /* Sampled from the villain's own artwork, then folded into the warm band. */
+  --threat:#C9333E;
+
+  /* The seats. Two cool hues, far enough apart to tell at a glance and far
+     enough from the villain's half that neither is ever mistaken for it. */
+  --s1:#4B8DF8;
+  --s2:#39C2A4;
+  /* Whoever is acting. Set on :root when the turn passes, so the button, the
+     highlights and the dock all move with the turn. */
+  --seat:var(--s1);
+  /* The heroes together. The front line's left bar is the damage the table
+     has done to the villain, which belongs to both of you and does not change
+     when the turn passes — so it must not change colour when the turn passes
+     either. A bar that re-tints signals a change in a number that did not
+     move. */
+  --team:#8AA6D6;
+
+  --res-mental:#7C93D6;
+  --res-physical:#E0705F;
+  --res-energy:#E6BD48;
+  --res-wild:#4FC26B;
+
+  --hurt:#E5484D;
+
+  --f-display:"Big Shoulders Display","Big Shoulders",Impact,Haettenschweiler,sans-serif;
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ease:cubic-bezier(.22,.61,.36,1);
+
+  --ratio:.716;
+  --ch-lg:clamp(112px,21vh,200px);
+  --ch-md:clamp(88px,16.5vh,156px);
+  --ch-sm:clamp(68px,12vh,114px);
+  --ch-hand:clamp(118px,17.5vh,186px);
+
+  --rail:42px;
+  --line:62px;
+  --dock:calc(var(--ch-hand) + 64px);
+}
+/* Two boards share the width the solo board had to itself, so the table
+   scales down a step rather than making either hero scroll. */
+:root[data-seats="2"]{
+  --ch-lg:clamp(96px,17vh,166px);
+  --ch-md:clamp(78px,13.5vh,132px);
+  --ch-sm:clamp(56px,9.5vh,94px);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--ink);
+  color:var(--text);
+  font-family:var(--f-ui);
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+button{background:none;border:none;cursor:pointer;font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+[hidden]{display:none !important}
+:focus-visible{outline:2px solid var(--seat);outline-offset:2px;border-radius:2px}
+
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{
+  font-family:var(--f-mono);
+  font-size:9px;
+  font-weight:600;
+  letter-spacing:.17em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+}
+
+.table{
+  display:grid;
+  grid-template-rows:var(--rail) minmax(0,1fr) var(--line) minmax(0,1fr) var(--dock);
+  height:100vh;
+  height:100dvh;
+}
+
+/* ═══ Rail ═══════════════════════════════════════════════════════════════ */
+.rail{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  padding:0 16px;
+  background:var(--panel);
+  border-bottom:1px solid var(--rule);
+  z-index:6;
+}
+.rail-back{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:14px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted);
+  transition:color .15s var(--ease);
+}
+.rail-back:hover{color:var(--text)}
+.rail-id{
+  display:flex;
+  align-items:baseline;
+  gap:9px;
+  font-family:var(--f-mono);
+  font-size:10.5px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--faint);
+}
+.rail-id b{font-weight:600;color:var(--dim)}
+.rail-tools{margin-left:auto;display:flex;align-items:center;gap:3px}
+.tool{
+  padding:6px 11px 7px;
+  border-radius:2px;
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:14px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--muted);
+  transition:background .14s var(--ease),color .14s var(--ease);
+}
+.tool:hover:not(:disabled){background:var(--panel-2);color:var(--text)}
+.tool[aria-expanded="true"]{background:var(--panel-3);color:var(--text)}
+.tool:disabled{color:#353B4A;cursor:not-allowed}
+.tool kbd{
+  font-family:var(--f-mono);
+  font-size:8.5px;
+  font-weight:500;
+  letter-spacing:0;
+  color:var(--faint);
+  margin-left:5px;
+}
+
+/* ═══ Territories ════════════════════════════════════════════════════════ */
+.field{
+  position:relative;
+  display:flex;
+  min-height:0;
+}
+.field.enemy{
+  align-items:flex-end;
+  padding:0 16px 12px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+}
+.field.enemy::-webkit-scrollbar{height:7px}
+.field.enemy::-webkit-scrollbar-thumb{background:var(--panel-3);border-radius:4px}
+.field.enemy::before{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:0;
+  height:74%;
+  pointer-events:none;
+  background:linear-gradient(to top,color-mix(in srgb,var(--threat) 9%,transparent),transparent);
+}
+
+/* ═══ Seats ══════════════════════════════════════════════════════════════
+   One person plays both heroes, so both boards are on screen at full size —
+   nothing is folded away and nothing has to be switched to. What changes with
+   the turn is only which seat is lit: the active seat's edge of the front
+   line glows in its own colour, so the line tells you whose turn it is at the
+   exact point where their country meets it. */
+.field.mine{align-items:stretch;padding:0}
+.seat{
+  position:relative;
+  flex:1 1 0;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  border-left:1px solid var(--rule);
+}
+.seat:first-child{border-left:none}
+.seat::before{
+  content:"";
+  position:absolute;
+  left:0;right:0;top:0;
+  height:2px;
+  background:transparent;
+  transition:background .25s var(--ease);
+  z-index:2;
+}
+.seat.on::before{background:var(--s)}
+.seat::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;top:0;
+  height:74%;
+  pointer-events:none;
+  opacity:0;
+  background:linear-gradient(to bottom,color-mix(in srgb,var(--s) 13%,transparent),transparent);
+  transition:opacity .25s var(--ease);
+}
+.seat.on::after{opacity:1}
+
+/* The board and its nameplate hang together from the front line; the felt in
+   front of each hero is the space left over below. */
+.seat-lanes{
+  position:relative;
+  z-index:1;
+  flex:0 0 auto;
+  display:flex;
+  align-items:flex-start;
+  min-height:0;
+  padding:12px 14px 0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+}
+.seat-lanes::-webkit-scrollbar{height:7px}
+.seat-lanes::-webkit-scrollbar-thumb{background:var(--panel-3);border-radius:4px}
+
+/* The nameplate. It answers, for each hero, the four things two-handed play
+   makes you keep asking: who, how hurt, how many cards, and who goes first. */
+.plate{
+  position:relative;
+  z-index:1;
+  flex:0 0 auto;
+  display:flex;
+  align-items:baseline;
+  gap:11px;
+  padding:7px 14px 11px;
+  min-width:0;
+}
+.plate-name{
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:19px;
+  line-height:1;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  transition:color .2s var(--ease);
+}
+.seat.on .plate-name{color:var(--text)}
+.plate-hp{
+  font-family:var(--f-mono);
+  font-size:11px;
+  font-weight:600;
+  color:var(--s);
+  white-space:nowrap;
+}
+.plate-meta{
+  font-family:var(--f-mono);
+  font-size:9px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.plate-first{
+  padding:1px 5px 2px;
+  border-radius:2px;
+  background:var(--panel-3);
+  font-family:var(--f-mono);
+  font-size:8px;
+  font-weight:600;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--dim);
+}
+.plate-turn{
+  font-family:var(--f-mono);
+  font-size:8.5px;
+  font-weight:600;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+  color:var(--s);
+  white-space:nowrap;
+}
+
+/* A zone is a labelled run of cards. The label is the only chrome. */
+.zone{
+  position:relative;
+  z-index:1;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:0 14px;
+  border-left:1px solid var(--rule-soft);
+  flex:0 0 auto;
+  min-width:0;
+}
+.zone:first-child{border-left:none;padding-left:0}
+.zone.grow{flex:1 1 auto}
+.zone.pushed{margin-left:auto;border-left:none}
+.field.mine .zone{flex-direction:column-reverse}
+.zone-head{display:flex;align-items:baseline;gap:8px;height:13px}
+.zone-n{font-family:var(--f-mono);font-size:9px;color:var(--faint)}
+.lane{display:flex;align-items:flex-end;gap:7px;height:var(--ch-lg)}
+.field.mine .lane{align-items:flex-start}
+/* Upgrades are attached to the hero, not standing beside them, so they sit
+   tight against the identity card rather than a card's width away. */
+.lane.attached{gap:3px}
+
+.zone-empty{
+  display:flex;
+  align-items:flex-end;
+  height:var(--ch-md);
+  padding:0 8px 3px 0;
+  font-size:11.5px;
+  color:#3C4356;
+  white-space:nowrap;
+}
+.field.mine .zone-empty{align-items:flex-start;padding:3px 8px 0 0}
+
+/* ═══ Card ═══════════════════════════════════════════════════════════════
+   The card is the printed card. Nothing is drawn across its face. Everything
+   the game adds lives on the edges: what it can still take along the bottom,
+   what has been done to it along the top. */
+.card{
+  position:relative;
+  flex:0 0 auto;
+  width:calc(var(--h) * var(--ratio));
+  height:var(--h);
+  --h:var(--ch-md);
+  border-radius:4px;
+  background:var(--panel-2);
+  display:block;
+  text-align:left;
+  transition:transform .16s var(--ease),box-shadow .16s var(--ease),opacity .16s var(--ease);
+}
+.card.lg{--h:var(--ch-lg)}
+.card.sm{--h:var(--ch-sm)}
+.card-face{
+  position:absolute;
+  inset:0;
+  border-radius:4px;
+  overflow:hidden;
+  background:var(--panel-3);
+}
+.card-art{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  opacity:0;
+  transition:opacity .3s var(--ease);
+}
+.card-art.in{opacity:1}
+/* A scheme is printed on its side; the server stands every landscape image up
+   before it sends it, so it is laid back down here. */
+.card.wide{width:var(--h);height:calc(var(--h) * var(--ratio))}
+.card.wide .card-art{
+  inset:auto;
+  left:50%;top:50%;
+  width:calc(var(--h) * var(--ratio));
+  height:var(--h);
+  transform:translate(-50%,-50%) rotate(90deg);
+}
+
+.card:hover{transform:translateY(-3px)}
+.field.mine .card:hover{transform:translateY(3px)}
+
+/* Every clock in this game is a bar along the bottom of the thing it counts
+   down. The two that decide the game are the same bar, enlarged onto the
+   front line. */
+.meter{
+  position:absolute;
+  left:0;right:0;bottom:0;
+  height:4px;
+  border-radius:0 0 4px 4px;
+  background:rgba(11,12,17,.82);
+  overflow:hidden;
+}
+.meter i{
+  display:block;
+  height:100%;
+  width:var(--p,0%);
+  background:var(--mc,var(--hurt));
+  transition:width .45s var(--ease);
+}
+.tag{
+  position:absolute;
+  left:4px;bottom:8px;
+  display:inline-flex;
+  align-items:baseline;
+  gap:3px;
+  padding:1px 5px 2px;
+  border-radius:2px;
+  background:rgba(11,12,17,.86);
+  backdrop-filter:blur(3px);
+  font-family:var(--f-mono);
+  font-size:10px;
+  font-weight:600;
+  line-height:1.3;
+  color:var(--text);
+}
+.tag em{font-style:normal;font-size:8px;font-weight:500;color:var(--muted)}
+.tag.hp{color:#FFC9C9}
+.tag.thr{color:#FFD3A6}
+
+/* What has been done to a card sits above it, never on it. */
+.pips{position:absolute;left:0;right:0;top:-9px;display:flex;gap:3px;flex-wrap:wrap}
+.pip{
+  padding:1px 4px 2px;
+  border-radius:2px;
+  font-family:var(--f-mono);
+  font-size:8px;
+  font-weight:600;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  line-height:1.2;
+  background:var(--panel-3);
+  color:var(--dim);
+}
+.pip.stun{background:#3A2E12;color:#F0C767}
+.pip.confuse{background:#2A1F3C;color:#C2A5F0}
+.pip.tough{background:#1E3040;color:#8FC4E8}
+.pip.guard{background:#2A2E3C;color:#B6BFD4}
+/* A minion is engaged with one hero in particular. It wears that hero's
+   colour so the engaged lane needs no second row and no arrows. */
+.pip.who{background:color-mix(in srgb,var(--w) 22%,var(--ink));color:var(--w)}
+
+/* An exhausted card is tipped, the way you tip a card on a table. It carries
+   no label: the tilt says it, the colour draining says it, and the dock names
+   whoever is still ready. A third way of saying it would be noise. */
+.card.exhausted{transform:rotate(-5deg);margin:0 5px}
+.card.exhausted:hover{transform:rotate(-5deg) translateY(-3px)}
+.card.exhausted .card-art{filter:saturate(.45) brightness(.72)}
+
+.cost{
+  position:absolute;
+  top:4px;left:4px;
+  min-width:19px;
+  height:19px;
+  padding:0 4px;
+  border-radius:2px;
+  background:rgba(11,12,17,.88);
+  backdrop-filter:blur(3px);
+  font-family:var(--f-mono);
+  font-size:11px;
+  font-weight:600;
+  line-height:19px;
+  text-align:center;
+}
+.res{position:absolute;top:4px;right:4px;display:flex;gap:2px}
+.res i{
+  width:8px;height:8px;
+  border-radius:50%;
+  background:var(--rc);
+  box-shadow:0 0 0 1.5px rgba(11,12,17,.8);
+}
+
+/* Newly drawn — a rule along the top edge in the seat's colour, not a sticker
+   across the art. */
+.card.fresh::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;top:0;
+  height:2px;
+  border-radius:4px 4px 0 0;
+  background:var(--s,var(--seat));
+}
+
+/* Legality. When the game is waiting for a choice, what you can click is the
+   only thing at full strength. */
+.picking .card,.picking .stack{opacity:.3;pointer-events:none}
+.picking .card.legal{opacity:1;pointer-events:auto;cursor:pointer}
+.card.legal{box-shadow:inset 0 0 0 2px var(--seat),0 0 18px -4px var(--seat)}
+.card.chosen{
+  opacity:1 !important;
+  box-shadow:inset 0 0 0 3px var(--seat),0 0 22px -2px var(--seat);
+  transform:translateY(-6px);
+}
+.field.mine .card.chosen{transform:translateY(6px)}
+.card.acting{box-shadow:inset 0 0 0 2px var(--seat)}
+/* On someone else's turn their board is readable but not clickable, which is
+   the whole point of playing two hands: you never act with the wrong hero by
+   accident. */
+.seat:not(.on) .card{cursor:default}
+
+/* ═══ Deck stacks ════════════════════════════════════════════════════════ */
+.stack{
+  position:relative;
+  width:calc(var(--ch-sm) * var(--ratio));
+  height:var(--ch-sm);
+  border-radius:3px;
+  background:var(--panel-2);
+  box-shadow:inset 0 0 0 1px var(--rule),2px 2px 0 -1px var(--panel-2),4px 4px 0 -2px var(--panel-2);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:1px;
+  transition:box-shadow .14s var(--ease);
+}
+.stack:hover{box-shadow:inset 0 0 0 1px var(--rule),2px 2px 0 -1px var(--panel-3),4px 4px 0 -2px var(--panel-3)}
+.stack.enc{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--threat) 34%,var(--rule)),2px 2px 0 -1px var(--panel-2),4px 4px 0 -2px var(--panel-2)}
+.stack-n{position:relative;z-index:1;font-family:var(--f-mono);font-size:16px;font-weight:600;line-height:1}
+.stack-l{position:relative;z-index:1;font-family:var(--f-mono);font-size:8px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.stack.out .stack-n{color:var(--faint)}
+/* A discard pile shows what is on top of it. "What just hit me" should not
+   require opening anything. */
+.stack-face{
+  position:absolute;
+  inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  border-radius:3px;
+  opacity:.3;
+  filter:saturate(.5);
+  transition:opacity .14s var(--ease);
+}
+.stack:has(.stack-face)::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:3px;
+  background:linear-gradient(to top,rgba(11,12,17,.86),rgba(11,12,17,.42));
+  pointer-events:none;
+}
+.stack:hover .stack-face{opacity:.46}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   THE FRONT LINE
+
+   Marvel Champions is one question asked every turn: hit him, or hold the
+   scheme? It is a race between two clocks, and the board showed neither — you
+   read a number painted on a card and did the arithmetic.
+
+   Here the two clocks are the divider itself. Your damage runs in from the
+   left in the acting hero's colour; the scheme's threat runs in from the
+   right in the villain's. The centre is the finish. Whichever fill reaches it
+   first ends the game, and you can see which is further without reading a
+   single digit.
+   ═══════════════════════════════════════════════════════════════════════ */
+.front{
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;
+  background:var(--panel);
+  border-top:1px solid var(--rule);
+  border-bottom:1px solid var(--rule);
+  z-index:5;
+  transition:background .3s var(--ease);
+}
+.side{display:flex;flex-direction:column;gap:5px;padding:9px 0 10px;min-width:0}
+.side.r{align-items:flex-end}
+.side-head{display:flex;align-items:baseline;gap:9px;padding:0 16px;min-width:0}
+.side-name{
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:19px;
+  line-height:1;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.side-num{font-family:var(--f-mono);font-size:11px;font-weight:600;white-space:nowrap}
+.side.l .side-num{color:var(--team)}
+.side.r .side-num{color:var(--threat)}
+.side-sub{
+  font-family:var(--f-mono);
+  font-size:9px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+}
+
+/* The right-hand side is right-aligned, which would otherwise shrink the
+   track to the width of its own emptiness. */
+.track{position:relative;width:100%;height:10px;background:var(--panel-2);overflow:hidden}
+.track i{
+  position:absolute;
+  top:0;bottom:0;
+  width:var(--p,0%);
+  transition:width .6s var(--ease),left .6s var(--ease),background .3s var(--ease);
+}
+.side.l .track i{left:0;background:var(--team)}
+.side.r .track i{right:0;background:var(--threat)}
+/* The stage you are on is solid; the ones you already broke through stay
+   behind you, spent, so the bar says "second of three" without a caption. */
+.side.l .track i.done{background:color-mix(in srgb,var(--team) 38%,var(--panel-2))}
+.side.l .track i.now{left:var(--from,0%);width:var(--w,0%)}
+/* Ticks divide the villain's bar into his three stages. */
+.track b{position:absolute;top:0;bottom:0;width:1px;background:var(--ink);left:var(--at)}
+/* Threat that is coming whatever you do. */
+.track u{
+  position:absolute;
+  top:0;bottom:0;
+  right:var(--from,0%);
+  width:var(--w,0%);
+  border-left:1px solid color-mix(in srgb,var(--threat) 80%,transparent);
+  background:repeating-linear-gradient(-45deg,
+    color-mix(in srgb,var(--threat) 52%,transparent) 0 3px,
+    transparent 3px 6px);
+  transition:right .6s var(--ease),width .6s var(--ease);
+}
+
+.clock{
+  align-self:stretch;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:1px;
+  padding:0 20px;
+  border-left:1px solid var(--rule);
+  border-right:1px solid var(--rule);
+  background:var(--ink);
+}
+.clock-r{
+  font-family:var(--f-display);
+  font-weight:800;
+  font-size:26px;
+  line-height:.86;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+}
+.clock-r span{font-size:11px;letter-spacing:.16em;color:var(--muted);margin-right:5px;vertical-align:2px}
+.clock-p{
+  font-family:var(--f-mono);
+  font-size:8.5px;
+  font-weight:600;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+  color:var(--seat);
+  white-space:nowrap;
+  transition:color .3s var(--ease);
+}
+.front.villain-turn{background:color-mix(in srgb,var(--threat) 8%,var(--panel))}
+.front.villain-turn .clock-p{color:var(--threat)}
+
+/* ═══ Dock ═══════════════════════════════════════════════════════════════
+   The acting hero's hand, their piles, what the game is asking, and the
+   button that answers it — one strip, all within a hand's reach. The hand is
+   never clipped by the bottom of the window again. */
+.dock{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:stretch;
+  background:var(--panel);
+  border-top:2px solid var(--seat);
+  z-index:6;
+  --s:var(--seat);
+  transition:border-color .25s var(--ease);
+}
+.piles{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:0 16px;
+  border-right:1px solid var(--rule-soft);
+}
+
+.hand-wrap{display:flex;flex-direction:column;min-width:0;padding:0 14px}
+.hand-head{display:flex;align-items:baseline;gap:9px;height:26px;flex:0 0 auto}
+.hand-head .who{
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:15px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--seat);
+  transition:color .25s var(--ease);
+}
+.hand{
+  flex:1 1 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-width:0;
+  padding-bottom:12px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+}
+.hand::-webkit-scrollbar{height:7px}
+.hand::-webkit-scrollbar-thumb{background:var(--panel-3);border-radius:4px}
+.hand .card{--h:var(--ch-hand);cursor:pointer}
+.hand .card:hover{transform:translateY(-7px)}
+/* A card committed to a cost sinks into the tray. Click it again to take it
+   back. */
+.picking .card.legal.spent,.hand .card.spent{opacity:.42;transform:translateY(13px)}
+.picking .card.legal.spent:hover{transform:translateY(9px)}
+.picking .card.acting{opacity:1;transform:translateY(-7px)}
+
+/* ═══ Ask ════════════════════════════════════════════════════════════════ */
+.ask{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:9px;
+  padding:0 16px;
+  border-left:1px solid var(--rule-soft);
+  min-width:308px;
+  max-width:360px;
+}
+.ask-text{display:flex;gap:9px;font-size:13px;line-height:1.45;color:var(--dim)}
+.ask-text::before{
+  content:"";
+  flex:0 0 2px;
+  align-self:stretch;
+  background:var(--seat);
+  transition:background .2s var(--ease);
+}
+.ask.enemy .ask-text::before{background:var(--threat)}
+.ask-text b{font-weight:600;color:var(--text)}
+
+/* Forgetting an ally who had not acted yet is the commonest way to lose, and
+   twice as easy with two heroes. The dock says who is still standing up. */
+.ready{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px 9px;
+  padding-left:11px;
+  font-family:var(--f-mono);
+  font-size:10px;
+  letter-spacing:.05em;
+  color:var(--muted);
+}
+.ready b{font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.ready span{color:var(--dim)}
+.ready span + span::before{content:"· ";color:var(--faint)}
+.ready.none{color:var(--faint)}
+
+/* Paying a cost is counting to a number. Count it out loud. */
+.pay{display:flex;align-items:center;gap:7px}
+.pay-pips{display:flex;gap:4px}
+.pay-pips i{
+  width:11px;height:11px;
+  border-radius:50%;
+  box-shadow:inset 0 0 0 1.5px var(--rule);
+  transition:background .18s var(--ease),box-shadow .18s var(--ease);
+}
+.pay-pips i.on{background:var(--seat);box-shadow:none}
+.pay-l{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+/* The choices the game offers. They were a floating rack in the middle of the
+   table; they belong beside the thing that confirms them. */
+.opts{display:flex;flex-wrap:wrap;gap:4px}
+.opt{
+  padding:5px 10px 6px;
+  border-radius:2px;
+  background:var(--panel-2);
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:15px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--dim);
+  transition:background .14s var(--ease),color .14s var(--ease);
+}
+.opt:hover{background:var(--panel-3);color:var(--text)}
+.opt[aria-pressed="true"]{background:var(--seat);color:var(--ink)}
+
+.acts{display:flex;gap:6px}
+.act{
+  flex:1;
+  min-width:0;
+  height:42px;
+  border-radius:3px;
+  font-family:var(--f-display);
+  font-weight:800;
+  font-size:19px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  transition:filter .14s var(--ease),background .14s var(--ease),color .14s var(--ease);
+}
+.act.primary{background:var(--seat);color:var(--ink)}
+.act.primary:hover:not(:disabled){filter:brightness(1.12)}
+.act.primary:disabled{background:var(--panel-2);color:#3F4557;cursor:not-allowed}
+.act.ghost{flex:0 0 auto;padding:0 15px;background:var(--panel-2);color:var(--muted)}
+.act.ghost:hover{background:var(--panel-3);color:var(--text)}
+.act kbd{
+  display:block;
+  font-family:var(--f-mono);
+  font-size:8px;
+  font-weight:500;
+  letter-spacing:.06em;
+  opacity:.6;
+  margin-top:-3px;
+}
+
+/* ═══ Preview ════════════════════════════════════════════════════════════ */
+.peek{
+  position:fixed;
+  top:50%;
+  transform:translateY(-50%);
+  width:clamp(196px,16vw,268px);
+  z-index:40;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .14s var(--ease);
+  filter:drop-shadow(0 14px 34px rgba(0,0,0,.7));
+}
+.peek.on{opacity:1}
+.peek.left{left:18px}
+.peek.right{right:18px}
+.peek img{width:100%;display:block;border-radius:7px}
+.peek.turn img{transform:rotate(90deg) scale(.716);transform-origin:center}
+.peek-cap{
+  margin-top:9px;
+  font-family:var(--f-mono);
+  font-size:9.5px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  text-align:center;
+}
+
+/* ═══ Sheet ══════════════════════════════════════════════════════════════ */
+.sheet{
+  position:fixed;
+  top:0;bottom:0;right:0;
+  width:min(384px,88vw);
+  z-index:50;
+  display:flex;
+  flex-direction:column;
+  background:var(--panel);
+  border-left:1px solid var(--rule);
+  transform:translateX(100%);
+  transition:transform .26s var(--ease);
+}
+.sheet.on{transform:none}
+.sheet-head{
+  display:flex;
+  align-items:flex-end;
+  gap:20px;
+  padding:0 18px;
+  border-bottom:1px solid var(--rule);
+  flex:0 0 auto;
+}
+.sheet-tab{
+  position:relative;
+  padding:16px 0 12px;
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:20px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  transition:color .15s var(--ease);
+}
+.sheet-tab[aria-selected="true"]{color:var(--text)}
+.sheet-tab[aria-selected="true"]::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:-1px;
+  height:2px;
+  background:var(--seat);
+}
+.sheet-x{margin-left:auto;padding-bottom:13px;font-size:17px;color:var(--muted)}
+.sheet-x:hover{color:var(--text)}
+.sheet-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 18px 22px}
+.sheet-body::-webkit-scrollbar{width:8px}
+.sheet-body::-webkit-scrollbar-thumb{background:var(--panel-3);border-radius:4px}
+
+.log-round{display:flex;align-items:center;gap:11px;padding:17px 0 8px}
+.log-round span{
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:13px;
+  letter-spacing:.17em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.log-round hr{flex:1;border:none;border-top:1px solid var(--rule-soft)}
+.log-line{
+  display:grid;
+  grid-template-columns:22px 1fr;
+  gap:10px;
+  padding:4px 0;
+  font-size:12.5px;
+  line-height:1.5;
+  color:var(--dim);
+}
+.log-line i{font-family:var(--f-mono);font-style:normal;font-size:9.5px;color:#3C4356;padding-top:2px}
+.log-line em{font-style:normal;font-weight:600;color:var(--text)}
+.log-line.bad em{color:#F0A6A6}
+.log-line.good em{color:#9FE0AC}
+/* Which hero a line is about, without writing it out every time. */
+.log-line u{
+  text-decoration:none;
+  font-weight:600;
+  color:var(--w,var(--dim));
+}
+
+.set-block{padding:16px 0 4px;border-bottom:1px solid var(--rule-soft)}
+.set-block:last-child{border-bottom:none}
+.set-row{display:flex;align-items:center;gap:12px;padding:7px 0 8px}
+.set-row label{flex:1;min-width:0;font-size:13px;color:var(--dim)}
+.set-row label small{display:block;font-size:11px;color:var(--muted)}
+.sw{
+  flex:0 0 auto;
+  width:34px;height:19px;
+  border-radius:10px;
+  background:var(--panel-3);
+  position:relative;
+  transition:background .16s var(--ease);
+}
+.sw::after{
+  content:"";
+  position:absolute;
+  top:3px;left:3px;
+  width:13px;height:13px;
+  border-radius:50%;
+  background:var(--muted);
+  transition:transform .16s var(--ease),background .16s var(--ease);
+}
+.sw[aria-checked="true"]{background:color-mix(in srgb,var(--seat) 40%,var(--panel-3))}
+.sw[aria-checked="true"]::after{transform:translateX(15px);background:var(--seat)}
+
+.scrim{
+  position:fixed;
+  inset:0;
+  z-index:45;
+  background:rgba(11,12,17,.5);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .22s var(--ease);
+}
+.scrim.on{opacity:1;pointer-events:auto}
+
+/* ═══ Moments ════════════════════════════════════════════════════════════ */
+.float{
+  position:fixed;
+  z-index:60;
+  font-family:var(--f-display);
+  font-weight:800;
+  font-size:30px;
+  line-height:1;
+  pointer-events:none;
+  animation:rise 1.05s var(--ease) forwards;
+}
+.float.dmg{color:var(--seat)}
+.float.thr{color:var(--threat)}
+.float.hurt{color:var(--hurt)}
+@keyframes rise{
+  0%{opacity:0;transform:translate(-50%,4px) scale(.85)}
+  18%{opacity:1;transform:translate(-50%,-6px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-34px) scale(1)}
+}
+
+.banner{
+  position:fixed;
+  left:0;right:0;
+  top:calc(var(--rail) + 4px);
+  z-index:44;
+  display:flex;
+  justify-content:center;
+  pointer-events:none;
+}
+.banner span{
+  padding:7px 22px 8px;
+  border-radius:2px;
+  background:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--bc,var(--rule));
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:17px;
+  letter-spacing:.19em;
+  text-transform:uppercase;
+  color:var(--bt,var(--dim));
+  opacity:0;
+  animation:banner 1.9s var(--ease) forwards;
+}
+@keyframes banner{
+  0%{opacity:0;transform:translateY(-7px)}
+  14%,74%{opacity:1;transform:none}
+  100%{opacity:0;transform:translateY(-7px)}
+}
+
+@media (max-width:1180px){
+  .ask{min-width:250px}
+  .rail-id{display:none}
+}
+@media (max-width:920px){
+  :root{--ch-lg:clamp(92px,15vh,148px);--ch-md:clamp(74px,12vh,118px);--ch-sm:clamp(58px,9vh,92px)}
+  /* Two boards no longer fit side by side; they stack, and each keeps its
+     own nameplate. */
+  .field.mine{flex-direction:column;overflow-y:auto}
+  .seat{border-left:none;border-top:1px solid var(--rule);flex:0 0 auto}
+  .seat:first-child{border-top:none}
+  .dock{grid-template-columns:auto minmax(0,1fr)}
+  .ask{grid-column:1 / -1;border-left:none;border-top:1px solid var(--rule-soft);max-width:none;padding:10px 16px}
+  .table{grid-template-rows:var(--rail) minmax(0,1fr) var(--line) minmax(0,1fr) auto}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms !important;animation-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<div class="table">
+
+  <header class="rail">
+    <a class="rail-back" href="/">&#8592;&nbsp; Menu</a>
+    <div class="rail-id" id="rail-id"></div>
+    <div class="rail-tools">
+      <button class="tool" id="t-undo">Undo<kbd>&#8984;Z</kbd></button>
+      <button class="tool" id="t-log" aria-expanded="false">Log<kbd>L</kbd></button>
+      <button class="tool" id="t-set" aria-expanded="false">Settings</button>
+    </div>
+  </header>
+
+  <!-- ═══ The villain's half ═══════════════════════════════════════════ -->
+  <section class="field enemy" id="enemy">
+    <div class="zone">
+      <div class="zone-head"><span class="eyebrow">Villain</span></div>
+      <div class="lane" id="z-villain"></div>
+    </div>
+    <div class="zone">
+      <div class="zone-head"><span class="eyebrow">Main scheme</span></div>
+      <div class="lane" id="z-scheme"></div>
+    </div>
+    <div class="zone">
+      <div class="zone-head"><span class="eyebrow">Side schemes</span><span class="zone-n" id="n-side"></span></div>
+      <div class="lane" id="z-side"></div>
+    </div>
+    <div class="zone grow">
+      <div class="zone-head"><span class="eyebrow">Engaged</span><span class="zone-n" id="n-min"></span></div>
+      <div class="lane" id="z-minions"></div>
+    </div>
+    <div class="zone pushed">
+      <div class="zone-head"><span class="eyebrow">Encounter</span></div>
+      <div class="lane">
+        <button class="stack enc" id="enc-deck">
+          <span class="stack-n mono" id="enc-deck-n">0</span><span class="stack-l">Deck</span>
+        </button>
+        <button class="stack" id="enc-disc">
+          <span class="stack-n mono" id="enc-disc-n">0</span><span class="stack-l">Discard</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ The front line ═══════════════════════════════════════════════ -->
+  <div class="front" id="front">
+    <div class="side l">
+      <div class="side-head">
+        <span class="side-name" id="f-vname">Rhino</span>
+        <span class="side-num mono" id="f-vnum"></span>
+      </div>
+      <div class="track" id="f-vtrack"></div>
+      <div class="side-head"><span class="side-sub" id="f-vsub"></span></div>
+    </div>
+
+    <div class="clock">
+      <div class="clock-r"><span>Round</span><b id="f-round">1</b></div>
+      <div class="clock-p" id="f-phase"></div>
+    </div>
+
+    <div class="side r">
+      <div class="side-head">
+        <span class="side-num mono" id="f-snum"></span>
+        <span class="side-name" id="f-sname">The Break-In!</span>
+      </div>
+      <div class="track" id="f-strack"></div>
+      <div class="side-head"><span class="side-sub" id="f-ssub"></span></div>
+    </div>
+  </div>
+
+  <!-- ═══ The heroes' half — one board per seat ════════════════════════ -->
+  <section class="field mine" id="mine"></section>
+
+  <!-- ═══ Dock ═════════════════════════════════════════════════════════ -->
+  <footer class="dock" id="dock">
+    <div class="piles">
+      <button class="stack" id="p-deck">
+        <span class="stack-n mono" id="p-deck-n">0</span><span class="stack-l">Deck</span>
+      </button>
+      <button class="stack" id="p-disc">
+        <span class="stack-n mono" id="p-disc-n">0</span><span class="stack-l">Discard</span>
+      </button>
+    </div>
+
+    <div class="hand-wrap">
+      <div class="hand-head">
+        <span class="who" id="hand-who"></span>
+        <span class="eyebrow">Hand</span>
+        <span class="zone-n mono" id="n-hand"></span>
+      </div>
+      <div class="hand" id="z-hand"></div>
+    </div>
+
+    <div class="ask" id="ask">
+      <p class="ask-text" id="ask-text"><span></span></p>
+      <p class="ready" id="ready"></p>
+      <div class="pay" id="pay" hidden>
+        <span class="pay-l" id="pay-l">Pay</span>
+        <span class="pay-pips" id="pay-pips"></span>
+      </div>
+      <div class="opts" id="opts"></div>
+      <div class="acts">
+        <button class="act ghost" id="a-cancel" hidden>Cancel<kbd>Esc</kbd></button>
+        <button class="act primary" id="a-go">End turn<kbd>Enter</kbd></button>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<figure class="peek left" id="peek-l"><img alt=""><figcaption class="peek-cap"></figcaption></figure>
+<figure class="peek right" id="peek-r"><img alt=""><figcaption class="peek-cap"></figcaption></figure>
+
+<div class="scrim" id="scrim"></div>
+<aside class="sheet" id="sheet" aria-hidden="true">
+  <div class="sheet-head">
+    <button class="sheet-tab" id="tab-log" aria-selected="true">Log</button>
+    <button class="sheet-tab" id="tab-set" aria-selected="false">Settings</button>
+    <button class="sheet-x" id="sheet-x" aria-label="Close">&times;</button>
+  </div>
+  <div class="sheet-body" id="pane-log"></div>
+  <div class="sheet-body" id="pane-set" hidden></div>
+</aside>
+
+<script>
+"use strict"
+const $ = s => document.querySelector(s)
+const el = (t,c) => { const n = document.createElement(t); if(c) n.className = c; return n }
+const wait = ms => new Promise(r => setTimeout(r, ms))
+
+/* ── The cards on this table. Art comes from the server, which serves every
+      card image at /<card id>, the route the menu and setup already use. ── */
+const DB = {
+  "01094":{n:"Rhino", t:"villain", atk:2, sch:1, stage:"I"},
+  "01095":{n:"Rhino", t:"villain", atk:3, sch:1, stage:"II"},
+  "01096":{n:"Rhino", t:"villain", atk:4, sch:1, stage:"III"},
+  "01097a":{n:"The Break-In!", t:"scheme", wide:true},
+  "01109":{n:"Bomb Scare", t:"scheme", wide:true},
+  "01101":{n:"Hydra Mercenary", t:"minion", hp:3, atk:1, sch:0},
+  "01103":{n:"Shocker", t:"minion", hp:3, atk:2, sch:1},
+  "01186":{n:"Advance", t:"treachery"},
+
+  "03001a":{n:"Captain America", t:"hero", hp:11, atk:2, thw:2, def:2, hs:5},
+  "03001b":{n:"Steve Rogers", t:"alter", hp:11, rec:3, hs:6},
+  "03013":{n:"Squirrel Girl", t:"ally", hp:2, atk:1, thw:1, cost:2, res:"mental"},
+  "03011":{n:"Falcon", t:"ally", hp:3, atk:2, thw:2, cost:4, res:"physical"},
+  "03009":{n:"Captain America's Shield", t:"upgrade", cost:1, res:"wild"},
+  "03010":{n:"Super-Soldier Serum", t:"upgrade", cost:2, res:"physical"},
+  "01092":{n:"Helicarrier", t:"support", cost:3, res:"physical"},
+  "03019":{n:"Quinjet", t:"support", cost:1, res:"energy"},
+  "03004":{n:"Heroic Strike", t:"event", cost:3, res:"physical"},
+  "03006":{n:"Shield Toss", t:"event", cost:0, res:"energy"},
+  "01071":{n:"Make the Call", t:"event", cost:0, res:"mental"},
+  "01090":{n:"Strength", t:"resource", cost:null, res:"physical", res2:"physical"},
+  "03015":{n:"Avengers Assemble!", t:"event", cost:4, res:"energy"},
+  "03003":{n:"Fearless Determination", t:"event", cost:0, res:"mental"},
+
+  "01019a":{n:"She-Hulk", t:"hero", hp:15, atk:3, thw:1, def:2, hs:4},
+  "01019b":{n:"Jennifer Walters", t:"alter", hp:15, rec:5, hs:6},
+  "01020":{n:"Hellcat", t:"ally", hp:3, atk:1, thw:2, cost:3, res:"wild"},
+  "01081":{n:"Armored Vest", t:"upgrade", cost:1, res:"mental"},
+  "01080":{n:"Med Team", t:"support", cost:3, res:"energy"},
+  "01091":{n:"Avengers Mansion", t:"support", cost:4, res:"mental"},
+  "01087":{n:"Haymaker", t:"event", cost:2, res:"energy"},
+  "01077":{n:"Counter-Punch", t:"event", cost:0, res:"physical"},
+  "01088":{n:"Energy", t:"resource", cost:null, res:"energy", res2:"energy"},
+  "01022":{n:"Ground Stomp", t:"event", cost:2, res:"mental"},
+  "01086":{n:"First Aid", t:"event", cost:1, res:"mental"},
+  "01024":{n:"One-Two Punch", t:"event", cost:1, res:"physical"},
+}
+
+/* Rhino's whole scenario. Every printed number here is "per player" — the
+   asterisk on the card — so the front line's denominators grow with the
+   number of heroes at the table, which is exactly what makes the race legible
+   at two hands as well as one. */
+const STAGES = [{id:"01094", per:14},{id:"01095", per:15},{id:"01096", per:16}]
+const SCHEME = {id:"01097a", n:"The Break-In!", targetPer:7, accelPer:1}
+
+const HEROES = 2 - (new URLSearchParams(location.search).has("solo") ? 1 : 0)
+
+function seat0(){
+  return {
+    i:0, colour:"var(--s1)", hero:"03001a", alter:"03001b", form:"hero",
+    dmg:3, exhausted:false, status:[],
+    allies:[{uid:"a1", id:"03013", dmg:0, exhausted:false},
+            {uid:"a2", id:"03011", dmg:1, exhausted:true}],
+    upgrades:[{uid:"u1", id:"03009"},{uid:"u2", id:"03010"}],
+    supports:[{uid:"s1", id:"01092", exhausted:true},{uid:"s2", id:"03019", exhausted:false}],
+    hand:[{uid:"h1",id:"03004"},{uid:"h2",id:"03006"},{uid:"h3",id:"01071",fresh:true},
+          {uid:"h4",id:"01090",fresh:true},{uid:"h5",id:"03015"}],
+    deck:21, disc:8, topDisc:"03006", first:true,
+    // What this hero draws back up to at the end of their turn.
+    pool:["03004","03006","01071","01090","03015","03003","03009","03010","01092","03019"],
+  }
+}
+function seat1(){
+  return {
+    i:1, colour:"var(--s2)", hero:"01019a", alter:"01019b", form:"hero",
+    dmg:4, exhausted:false, status:["tough"],
+    allies:[{uid:"b1", id:"01020", dmg:0, exhausted:false}],
+    upgrades:[{uid:"v1", id:"01081"}],
+    supports:[{uid:"t1", id:"01080", exhausted:false}],
+    hand:[{uid:"k1",id:"01087"},{uid:"k2",id:"01077"},
+          {uid:"k3",id:"01088",fresh:true},{uid:"k4",id:"01022"}],
+    deck:24, disc:5, topDisc:"01024", first:false,
+    pool:["01087","01077","01088","01022","01086","01024","01081","01091","01080","01020"],
+  }
+}
+
+const S = {
+  round:4,
+  phase:"player",
+  seats: HEROES === 1 ? [seat0()] : [seat0(), seat1()],
+  active:0,
+  acted:[],
+  villain:{stage:0, dmg:11, status:[]},
+  scheme:{threat:8},
+  sides:[{uid:"ss1", id:"01109", threat:3, target:5}],
+  minions: HEROES === 1
+    ? [{uid:"m1", id:"01101", dmg:1, status:["guard"], seat:0}]
+    : [{uid:"m1", id:"01101", dmg:1, status:["guard"], seat:0},
+       {uid:"m2", id:"01103", dmg:0, status:[], seat:1}],
+  enc:{deck:11, disc:6, top:"01186"},
+  log:[], logId:41,
+}
+S.acted = S.seats.map(() => false)
+if(HEROES === 1){ S.villain.dmg = 5; S.scheme.threat = 4; S.round = 3 }
+
+const P = { mode:"idle", src:null, action:null, targets:[], spent:[], cost:0, busy:false }
+
+const seat    = () => S.seats[S.active]
+const heroDB  = s => DB[s.form === "hero" ? s.hero : s.alter]
+const stageHP = () => STAGES[S.villain.stage].per * S.seats.length
+const target  = () => SCHEME.targetPer * S.seats.length
+const accel   = () => SCHEME.accelPer  * S.seats.length
+
+/* ── Villain colour, sampled the way the menu samples it, then folded into
+      the warm band. Rhino is a grey-blue animal and Klaw is a purple one;
+      neither may end up wearing a colour a seat is already wearing. ─────── */
+function accentFrom(img){
+  const c = el("canvas"); c.width = 64; c.height = 64
+  const x = c.getContext("2d",{willReadFrequently:true})
+  const sy = img.naturalHeight*0.08, sh = img.naturalHeight*0.44
+  x.drawImage(img, 0, sy, img.naturalWidth, sh, 0, 0, 64, 64)
+  const d = x.getImageData(0,0,64,64).data
+  const bins = new Array(24).fill(0)
+  for(let i=0;i<d.length;i+=4){
+    const r=d[i]/255,g=d[i+1]/255,b=d[i+2]/255
+    const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,dl=mx-mn
+    if(l<.12||l>.94||dl<.12) continue
+    let h
+    if(mx===r) h=((g-b)/dl+6)%6
+    else if(mx===g) h=(b-r)/dl+2
+    else h=(r-g)/dl+4
+    bins[Math.floor(h*60/15)%24] += dl*dl
+  }
+  let best=0
+  for(let i=1;i<24;i++) if(bins[i]>bins[best]) best=i
+  if(!bins[best]) return null
+  const h = best*15+7
+  const off = ((h - 8 + 540) % 360) - 180
+  return `hsl(${(8 + off*0.16 + 360) % 360} 58% 51%)`
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────── */
+function cardEl(id, o){
+  o = o || {}
+  const c = DB[id] || {}
+  const n = el("button","card")
+  n.className = "card" + (o.size ? " "+o.size : "") + (c.wide ? " wide" : "")
+                       + (o.exhausted ? " exhausted" : "") + (o.fresh ? " fresh" : "")
+  n.type = "button"
+  n.dataset.id = id
+  if(o.uid) n.dataset.uid = o.uid
+  if(o.seat != null) n.dataset.seat = o.seat
+  n.setAttribute("aria-label", c.n || id)
+
+  const face = el("div","card-face")
+  const img = el("img","card-art")
+  img.alt = ""
+  img.addEventListener("load", () => {
+    img.classList.add("in")
+    if(o.sample){ const a = accentFrom(img); if(a) document.documentElement.style.setProperty("--threat", a) }
+  })
+  img.src = "/" + id
+  face.appendChild(img)
+  n.appendChild(face)
+
+  // Statuses go above the card. Nothing is ever drawn across the picture.
+  const st = (o.status || []).slice()
+  if(o.who != null && S.seats.length > 1) st.unshift({who:o.who})
+  if(st.length){
+    const p = el("div","pips")
+    for(const s of st){
+      if(typeof s === "object"){
+        const q = el("span","pip who")
+        q.style.setProperty("--w", S.seats[s.who].colour)
+        q.textContent = shortName(S.seats[s.who])
+        p.appendChild(q); continue
+      }
+      const q = el("span","pip " + s)
+      q.textContent = {stun:"Stunned",confuse:"Confused",tough:"Tough",guard:"Guard"}[s] || s
+      p.appendChild(q)
+    }
+    n.appendChild(p)
+  }
+
+  // What it can still take, or how far it has got, along its bottom edge.
+  if(o.hp != null){
+    const t = el("span","tag hp mono"); t.innerHTML = (o.hp - (o.dmg||0)) + '<em>HP</em>'
+    n.appendChild(t)
+    const m = el("div","meter"); const f = el("i")
+    f.style.setProperty("--p", (100 - (o.dmg||0)/o.hp*100) + "%")
+    f.style.setProperty("--mc", o.mine ? "var(--s)" : "var(--threat)")
+    m.appendChild(f); n.appendChild(m)
+  }
+  if(o.threat != null){
+    const t = el("span","tag thr mono"); t.innerHTML = o.threat + '<em>/' + o.target + '</em>'
+    n.appendChild(t)
+    const m = el("div","meter"); const f = el("i")
+    f.style.setProperty("--p", Math.min(100, o.threat/o.target*100) + "%")
+    f.style.setProperty("--mc", "var(--threat)")
+    m.appendChild(f); n.appendChild(m)
+  }
+  if(o.showCost && c.cost != null){
+    const q = el("span","cost mono"); q.textContent = c.cost; n.appendChild(q)
+  }
+  if(o.showCost && c.res){
+    const r = el("div","res")
+    for(const k of [c.res, c.res2].filter(Boolean)){
+      const i = el("i"); i.style.setProperty("--rc", "var(--res-" + k + ")"); r.appendChild(i)
+    }
+    n.appendChild(r)
+  }
+
+  n.addEventListener("mouseenter", () => showPeek(id, n))
+  n.addEventListener("mouseleave", () => hidePeek())
+  n.addEventListener("focus", () => showPeek(id, n))
+  n.addEventListener("blur", () => hidePeek())
+  n.addEventListener("click", e => { e.stopPropagation(); onCard(n) })
+  return n
+}
+/* "Captain America" will not fit on a minion, but "Cap" reads instantly. */
+function shortName(s){
+  const n = heroDB(s).n
+  return n === "Captain America" ? "Cap" : n.split(" ")[0]
+}
+
+function lane(nodes, empty){
+  const z = el("div","lane")
+  if(!nodes.length){
+    const e = el("div","zone-empty"); e.textContent = empty || "—"
+    z.appendChild(e)
+  } else for(const n of nodes) z.appendChild(n)
+  return z
+}
+function fill(sel, nodes, empty){
+  const z = $(sel); z.textContent = ""
+  if(!nodes.length){
+    const e = el("div","zone-empty"); e.textContent = empty || "—"
+    z.appendChild(e); return
+  }
+  for(const n of nodes) z.appendChild(n)
+}
+
+/* ── Preview ──────────────────────────────────────────────────────────── */
+let peekT
+function showPeek(id, from){
+  clearTimeout(peekT)
+  const c = DB[id] || {}
+  // Shown on the side the card is not on, so it never covers what you point at.
+  const mid = from.getBoundingClientRect().left + from.offsetWidth/2
+  const p = mid > window.innerWidth/2 ? $("#peek-l") : $("#peek-r")
+  const other = p === $("#peek-l") ? $("#peek-r") : $("#peek-l")
+  other.classList.remove("on")
+  p.querySelector("img").src = "/" + id
+  p.querySelector(".peek-cap").textContent = c.n || ""
+  p.classList.toggle("turn", !!c.wide)
+  p.classList.add("on")
+}
+function hidePeek(now){
+  clearTimeout(peekT)
+  const off = () => { $("#peek-l").classList.remove("on"); $("#peek-r").classList.remove("on") }
+  // A redraw removes the node under the pointer without firing mouseleave, so
+  // the board asks for the preview to go directly.
+  if(now === true) off(); else peekT = setTimeout(off, 90)
+}
+
+/* ── Log ──────────────────────────────────────────────────────────────── */
+function who(s){
+  return '<u style="--w:' + s.colour + '">' + heroDB(s).n + '</u>'
+}
+function log(text, kind){
+  S.log.push({id:S.logId++, round:S.round, text, kind:kind||""})
+  if($("#sheet").classList.contains("on")) drawLog()
+}
+function drawLog(){
+  const p = $("#pane-log"); p.textContent = ""
+  let r = null
+  for(const e of S.log){
+    if(e.round !== r){
+      r = e.round
+      const h = el("div","log-round")
+      const s = el("span"); s.textContent = "Round " + r
+      h.appendChild(s); h.appendChild(el("hr")); p.appendChild(h)
+    }
+    const l = el("div","log-line " + e.kind)
+    const i = el("i"); i.textContent = e.id
+    const t = el("p"); t.innerHTML = e.text
+    l.appendChild(i); l.appendChild(t); p.appendChild(l)
+  }
+  p.scrollTop = p.scrollHeight
+}
+
+/* ── Moments ──────────────────────────────────────────────────────────── */
+function floatAt(node, text, kind){
+  if(!node) return
+  const r = node.getBoundingClientRect()
+  const f = el("div","float " + kind)
+  f.textContent = text
+  f.style.left = (r.left + r.width/2) + "px"
+  f.style.top = (r.top + r.height/2) + "px"
+  document.body.appendChild(f)
+  setTimeout(() => f.remove(), 1100)
+}
+function banner(text, colour){
+  const b = el("div","banner")
+  const s = el("span"); s.textContent = text
+  if(colour){
+    s.style.setProperty("--bc", "color-mix(in srgb," + colour + " 55%,transparent)")
+    s.style.setProperty("--bt", colour)
+  }
+  b.appendChild(s); document.body.appendChild(b)
+  setTimeout(() => b.remove(), 2000)
+}
+
+/* ── Draw ─────────────────────────────────────────────────────────────── */
+function draw(){
+  hidePeek(true)
+  document.documentElement.style.setProperty("--seat", seat().colour)
+
+  const vs = STAGES[S.villain.stage]
+  fill("#z-villain", [cardEl(vs.id, {size:"lg", hp:stageHP(), dmg:S.villain.dmg,
+                                     status:S.villain.status, sample:true})])
+  fill("#z-scheme",  [cardEl(SCHEME.id, {size:"lg", threat:S.scheme.threat, target:target()})])
+  fill("#z-side", S.sides.map(s => cardEl(s.id, {uid:s.uid, threat:s.threat, target:s.target})),
+       "None in play")
+  $("#n-side").textContent = S.sides.length || ""
+
+  fill("#z-minions", S.minions.map(m => cardEl(m.id, {uid:m.uid, hp:DB[m.id].hp, dmg:m.dmg,
+                                                      status:m.status, who:m.seat})),
+       "None engaged")
+  $("#n-min").textContent = S.minions.length || ""
+
+  drawSeats()
+
+  const s = seat()
+  $("#hand-who").textContent = heroDB(s).n
+  $("#z-hand").textContent = ""
+  for(const h of s.hand){
+    const n = cardEl(h.id, {uid:h.uid, seat:s.i, showCost:true, fresh:h.fresh})
+    if(P.spent.includes(h.uid)) n.classList.add("spent")
+    $("#z-hand").appendChild(n)
+  }
+  $("#n-hand").textContent = s.hand.length + " of " + heroDB(s).hs
+
+  $("#p-deck-n").textContent = s.deck
+  $("#p-disc-n").textContent = s.disc
+  $("#enc-deck-n").textContent = S.enc.deck
+  $("#enc-disc-n").textContent = S.enc.disc
+  $("#p-disc").classList.toggle("out", !s.disc)
+  $("#enc-disc").classList.toggle("out", !S.enc.disc)
+  faceStack("#p-disc", s.disc && s.topDisc)
+  faceStack("#enc-disc", S.enc.disc && S.enc.top)
+
+  $("#rail-id").innerHTML = "<b>Core Set</b><span>·</span><span>Standard</span><span>·</span>"
+    + "<span>" + (S.seats.length === 1 ? "Solo" : "Two-handed") + "</span>"
+
+  drawFront()
+  drawAsk()
+}
+
+/* One board per seat, side by side, both at full size. Nothing is folded away
+   and nothing has to be switched to. */
+function drawSeats(){
+  const m = $("#mine"); m.textContent = ""
+  for(const s of S.seats){
+    const sec = el("section","seat" + (s.i === S.active && S.phase === "player" ? " on" : ""))
+    sec.style.setProperty("--s", s.colour)
+
+    const lanes = el("div","seat-lanes")
+    const h = heroDB(s)
+
+    const idz = zone("Identity", "",
+      [cardEl(s.form === "hero" ? s.hero : s.alter,
+              {size:"lg", seat:s.i, hp:h.hp, dmg:s.dmg, mine:true,
+               status:s.status, exhausted:s.exhausted})]
+      .concat(s.upgrades.map(u => cardEl(u.id, {uid:u.uid, seat:s.i, size:"sm"}))),
+      "—")
+    idz.querySelector(".lane").classList.add("attached")
+    lanes.appendChild(idz)
+    lanes.appendChild(zone("Allies", s.allies.length || "",
+      s.allies.map(a => cardEl(a.id, {uid:a.uid, seat:s.i, hp:DB[a.id].hp, dmg:a.dmg,
+                                      mine:true, exhausted:a.exhausted})), "No allies"))
+    const sup = zone("Supports", "",
+      s.supports.map(x => cardEl(x.id, {uid:x.uid, seat:s.i, size:"sm", exhausted:x.exhausted})),
+      "None in play")
+    sup.classList.add("grow")
+    lanes.appendChild(sup)
+    sec.appendChild(lanes)
+
+    // The nameplate: who, how hurt, how many cards, and who goes first.
+    const plate = el("div","plate")
+    const nm = el("span","plate-name"); nm.textContent = h.n
+    const hp = el("span","plate-hp mono"); hp.textContent = (h.hp - s.dmg) + " HP"
+    const meta = el("span","plate-meta")
+    meta.textContent = "Hand " + s.hand.length + " of " + h.hs
+    plate.appendChild(nm); plate.appendChild(hp); plate.appendChild(meta)
+    if(s.first && S.seats.length > 1){
+      const f = el("span","plate-first"); f.textContent = "First"; plate.appendChild(f)
+    }
+    // "To act" would be a fourth way of saying what the lit edge, the wash and
+    // the dock already say. "Done" is the one that is not said anywhere else:
+    // has the other hero had their turn yet?
+    if(S.phase === "player" && s.i !== S.active && S.acted[s.i]){
+      const t = el("span","plate-turn")
+      t.style.color = "var(--faint)"; t.textContent = "Turn taken"
+      plate.appendChild(t)
+    }
+    sec.appendChild(plate)
+    m.appendChild(sec)
+  }
+}
+function zone(label, count, nodes, empty){
+  const z = el("div","zone")
+  const head = el("div","zone-head")
+  const e = el("span","eyebrow"); e.textContent = label
+  head.appendChild(e)
+  if(count){ const c = el("span","zone-n"); c.textContent = count; head.appendChild(c) }
+  z.appendChild(head)
+  z.appendChild(lane(nodes, empty))
+  return z
+}
+
+/* Shows the top of a discard pile behind its count. */
+function faceStack(sel, id){
+  const s = $(sel)
+  let img = s.querySelector(".stack-face")
+  if(!id){ if(img) img.remove(); s.removeAttribute("title"); return }
+  if(!img){ img = el("img","stack-face"); img.alt = ""; s.prepend(img) }
+  if(img.dataset.id !== id){ img.dataset.id = id; img.src = "/" + id }
+  s.title = "Top of pile: " + (DB[id] ? DB[id].n : id)
+}
+
+function drawFront(){
+  const vs = STAGES[S.villain.stage], v = DB[vs.id], n = S.seats.length
+  const total  = STAGES.reduce((a,s) => a + s.per, 0) * n
+  const before = STAGES.slice(0, S.villain.stage).reduce((a,s) => a + s.per, 0) * n
+
+  $("#f-vname").textContent = v.n + " " + v.stage
+  $("#f-vnum").textContent = (stageHP() - S.villain.dmg) + " HP left"
+  $("#f-vsub").textContent = "ATK " + v.atk + " · SCH " + v.sch
+                           + " · " + (before + S.villain.dmg) + " of " + total + " damage dealt"
+
+  const t = $("#f-vtrack"); t.textContent = ""
+  const done = el("i"); done.className = "done"
+  done.style.setProperty("--p", before/total*100 + "%")
+  t.appendChild(done)
+  const now = el("i"); now.className = "now"
+  now.style.setProperty("--from", before/total*100 + "%")
+  now.style.setProperty("--w", S.villain.dmg/total*100 + "%")
+  t.appendChild(now)
+  let acc = 0
+  for(let i=0;i<STAGES.length-1;i++){
+    acc += STAGES[i].per * n
+    const b = el("b"); b.style.setProperty("--at", acc/total*100 + "%"); t.appendChild(b)
+  }
+
+  $("#f-sname").textContent = SCHEME.n
+  $("#f-snum").textContent = S.scheme.threat + " of " + target()
+  $("#f-ssub").textContent = "Accelerates +" + accel() + " each round"
+
+  const st = $("#f-strack"); st.textContent = ""
+  const p = Math.min(100, S.scheme.threat/target()*100)
+  const f = el("i"); f.style.setProperty("--p", p + "%"); st.appendChild(f)
+  const g = el("u")
+  g.style.setProperty("--from", p + "%")
+  g.style.setProperty("--w", Math.max(0, Math.min(100-p, accel()/target()*100)) + "%")
+  st.appendChild(g)
+
+  $("#f-round").textContent = S.round
+  $("#f-phase").textContent = S.phase === "player"
+    ? (S.seats.length > 1 ? heroDB(seat()).n + "'s turn" : "Your turn")
+    : "Villain phase"
+  $("#front").classList.toggle("villain-turn", S.phase !== "player")
+}
+
+/* ── What the game is asking ──────────────────────────────────────────── */
+function say(html, enemy){
+  $("#ask-text").innerHTML = "<span>" + html + "</span>"
+  $("#ask").classList.toggle("enemy", !!enemy)
+}
+function drawAsk(){
+  const opts = $("#opts"); opts.textContent = ""
+  const pay = $("#pay"), go = $("#a-go"), cancel = $("#a-cancel")
+
+  document.body.classList.toggle("picking", P.mode === "target" || P.mode === "cost")
+  pay.hidden = P.mode !== "cost"
+  cancel.hidden = P.mode === "idle"
+  drawReady()
+
+  if(P.mode === "idle"){
+    if(S.phase !== "player"){
+      say("The villain is acting.", true)
+      go.disabled = true; setGo("Waiting")
+      return
+    }
+    const s = seat(), h = heroDB(s)
+    const others = s.allies.some(a => !a.exhausted) || s.supports.some(x => !x.exhausted)
+    say(!s.exhausted ? "Play a card, or take an action with <b>" + h.n + "</b>."
+        : others     ? "Play a card, or act with anyone still ready."
+                     : "Nothing left to do this turn.")
+    go.disabled = false
+    // The button says what happens next, so passing the hand between two
+    // heroes is never a guess.
+    const nxt = nextSeat()
+    setGo(nxt == null ? "End turn" : "Pass to " + heroDB(S.seats[nxt]).n, "Enter")
+    return
+  }
+
+  if(P.mode === "options"){
+    say("What should <b>" + DB[P.src.id].n + "</b> do?")
+    for(const a of P.src.actions){
+      const b = el("button","opt"); b.type = "button"; b.textContent = a
+      b.addEventListener("click", () => chooseAction(a))
+      opts.appendChild(b)
+    }
+    go.disabled = true; setGo("Confirm")
+    return
+  }
+
+  if(P.mode === "target"){
+    say(P.targets.length
+      ? "<b>" + P.action + "</b> " + DB[P.targets[0].id].n + " for " + P.amount + "."
+      : "Choose " + (P.action === "Attack" ? "an enemy" : "a scheme")
+        + " to " + P.action.toLowerCase() + ".")
+    go.disabled = !P.targets.length
+    setGo(P.targets.length ? P.action : "Choose a target", "Enter")
+    return
+  }
+
+  if(P.mode === "cost"){
+    const p = paid()
+    $("#pay-l").textContent = "Pay " + P.cost
+    const pp = $("#pay-pips"); pp.textContent = ""
+    for(let i=0;i<P.cost;i++){ const q = el("i"); if(i < p) q.className = "on"; pp.appendChild(q) }
+    say(p >= P.cost
+      ? "<b>" + DB[P.src.id].n + "</b> is paid for."
+      : "Spend " + (P.cost - p) + " more resource" + (P.cost-p === 1 ? "" : "s")
+        + " for <b>" + DB[P.src.id].n + "</b>.")
+    go.disabled = p < P.cost
+    // The line above already names the card; the button names the verb.
+    setGo("Play", "Enter")
+  }
+}
+/* A card can be worth more than one resource — Strength prints two. */
+function paid(){
+  return P.spent.reduce((a, uid) => {
+    const h = seat().hand.find(x => x.uid === uid)
+    return a + (h && DB[h.id].res2 ? 2 : 1)
+  }, 0)
+}
+function drawReady(){
+  const r = $("#ready")
+  r.textContent = ""; r.className = "ready"
+  if(P.mode !== "idle" || S.phase !== "player"){ r.hidden = true; return }
+  r.hidden = false
+  const s = seat(), names = []
+  if(!s.exhausted) names.push(heroDB(s).n)
+  for(const a of s.allies)   if(!a.exhausted) names.push(DB[a.id].n)
+  for(const x of s.supports) if(!x.exhausted) names.push(DB[x.id].n)
+  if(!names.length){
+    r.classList.add("none"); r.textContent = "Everything has acted this turn."; return
+  }
+  const b = el("b"); b.textContent = "Ready"; r.appendChild(b)
+  for(const n of names){ const q = el("span"); q.textContent = n; r.appendChild(q) }
+}
+function kbd(t){ const k = el("kbd"); k.textContent = t; return k }
+function setGo(label, key){
+  const go = $("#a-go"); go.textContent = label
+  if(key && !go.disabled) go.appendChild(kbd(key))
+}
+/* The next hero who has not taken a turn this round, or null if they all have
+   and the villain phase is next. */
+function nextSeat(){
+  for(let i=0;i<S.seats.length;i++) if(i !== S.active && !S.acted[i]) return i
+  return null
+}
+
+/* ── Clicking things ──────────────────────────────────────────────────── */
+function onCard(node){
+  if(P.busy || S.phase !== "player") return
+  const id = node.dataset.id, uid = node.dataset.uid
+  const owner = node.dataset.seat == null ? null : Number(node.dataset.seat)
+
+  if(P.mode === "target"){
+    if(!node.classList.contains("legal")) return
+    P.targets = [{id, uid, node}]
+    document.querySelectorAll(".card.chosen").forEach(n => n.classList.remove("chosen"))
+    node.classList.add("chosen")
+    drawAsk(); return
+  }
+
+  if(P.mode === "cost"){
+    if(!node.classList.contains("legal")) return
+    if(P.spent.includes(uid)) P.spent = P.spent.filter(x => x !== uid)
+    else if(paid() < P.cost) P.spent.push(uid)
+    draw(); markLegal(); return
+  }
+
+  if(P.mode !== "idle") return
+  // Two hands, one board: you can only act with the hero whose turn it is.
+  if(owner !== null && owner !== S.active) return
+
+  const s = seat()
+  const hand = s.hand.find(h => h.uid === uid)
+  if(hand){ startPlay(hand); return }
+
+  if(uid == null && (id === s.hero || id === s.alter) && !s.exhausted){
+    open(node, {id, actions: s.form === "hero"
+      ? ["Attack","Thwart","Defend","Change form"]
+      : ["Recover","Change form"]})
+    return
+  }
+  const ally = s.allies.find(a => a.uid === uid)
+  if(ally && !ally.exhausted){ open(node, {id, uid, ally, actions:["Attack","Thwart"]}); return }
+  const sup = s.supports.find(x => x.uid === uid)
+  if(sup && !sup.exhausted){ open(node, {id, uid, support:sup, actions:["Action"]}) }
+}
+function open(node, src){
+  P.mode = "options"; P.src = Object.assign({node}, src)
+  node.classList.add("acting")
+  drawAsk()
+}
+
+function startPlay(hand){
+  const c = DB[hand.id]
+  if(c.cost == null) return           // a plain resource card
+  P.mode = "cost"; P.src = {id:hand.id, uid:hand.uid, hand}; P.cost = c.cost; P.spent = []
+  if(c.cost === 0){ resolvePlay(); return }
+  draw(); markLegal(); drawAsk()
+}
+
+function chooseAction(a){
+  P.action = a
+  $("#opts").querySelectorAll(".opt").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.textContent === a)))
+
+  const s = seat()
+  if(a === "Change form"){
+    s.form = s.form === "hero" ? "alter" : "hero"
+    log(who(s) + " changes to <em>" + heroDB(s).n + "</em>.")
+    reset(); draw(); return
+  }
+  if(a === "Recover"){
+    const rec = heroDB(s).rec || 3
+    s.dmg = Math.max(0, s.dmg - rec)
+    s.exhausted = true
+    log(who(s) + " recovers <em>" + rec + "</em>.", "good")
+    reset(); draw(); return
+  }
+  if(a === "Defend" || a === "Action"){
+    exhaustSrc()
+    log(who(s) + (a === "Defend" ? " readies to defend." : " uses <em>" + DB[P.src.id].n + "</em>."))
+    reset(); draw(); return
+  }
+
+  const src = DB[P.src.id]
+  P.amount = a === "Attack" ? src.atk : src.thw
+  P.mode = "target"; P.targets = []
+  draw(); markLegal(); drawAsk()
+}
+
+/* Only what can legally be clicked stays lit — the single largest thing the
+   old table never told you. */
+function markLegal(){
+  document.querySelectorAll(".card.legal,.card.chosen").forEach(n =>
+    n.classList.remove("legal","chosen"))
+  if(P.mode === "target"){
+    const sel = P.action === "Attack"
+      ? "#z-villain .card, #z-minions .card"
+      : "#z-scheme .card, #z-side .card"
+    document.querySelectorAll(sel).forEach(n => n.classList.add("legal"))
+  }
+  if(P.mode === "cost"){
+    document.querySelectorAll("#z-hand .card").forEach(n => {
+      if(n.dataset.uid === P.src.uid){ n.classList.add("acting"); return }
+      n.classList.add("legal")
+    })
+  }
+}
+
+function exhaustSrc(){
+  const s = seat()
+  if(P.src.ally) P.src.ally.exhausted = true
+  else if(P.src.support) P.src.support.exhausted = true
+  else s.exhausted = true
+}
+
+/* ── Resolving ────────────────────────────────────────────────────────── */
+function confirmAction(){
+  if($("#a-go").disabled) return
+  if(P.mode === "idle") endTurn()
+  else if(P.mode === "cost") resolvePlay()
+  else if(P.mode === "target") resolveAction()
+}
+
+function resolvePlay(){
+  const s = seat(), hand = P.src.hand, c = DB[hand.id]
+  // The cards you spent, and the card itself, leave your hand. The last one
+  // spent is what the discard pile now shows.
+  const last = P.spent[P.spent.length-1]
+  if(last) s.topDisc = (s.hand.find(h => h.uid === last) || {}).id || s.topDisc
+  const gone = new Set([hand.uid, ...P.spent])
+  s.hand = s.hand.filter(h => !gone.has(h.uid))
+  s.disc += P.spent.length
+
+  const uid = "n" + Math.random().toString(36).slice(2,7)
+  if(c.t === "ally")         s.allies.push({uid, id:hand.id, dmg:0, exhausted:false})
+  else if(c.t === "support") s.supports.push({uid, id:hand.id, exhausted:false})
+  else if(c.t === "upgrade") s.upgrades.push({uid, id:hand.id})
+  else { s.disc += 1; s.topDisc = hand.id }   // an event goes to the pile
+
+  log(who(s) + " plays <em>" + c.n + "</em>" + (P.cost ? " for " + P.cost + "." : "."), "good")
+  reset(); draw()
+}
+
+function resolveAction(){
+  const s = seat(), t = P.targets[0], amount = P.amount
+  const node = document.querySelector('#z-minions [data-uid="' + t.uid + '"]')
+            || document.querySelector('#z-side [data-uid="' + t.uid + '"]')
+            || document.querySelector('#z-villain .card')
+            || document.querySelector('#z-scheme .card')
+
+  if(P.action === "Attack"){
+    const m = t.uid ? S.minions.find(x => x.uid === t.uid) : null
+    if(m){
+      m.dmg += amount
+      if(m.dmg >= DB[m.id].hp){
+        S.minions = S.minions.filter(x => x.uid !== m.uid)
+        S.enc.disc += 1; S.enc.top = m.id
+        log(who(s) + " defeats <em>" + DB[m.id].n + "</em>.", "good")
+      } else log(who(s) + " hits <em>" + DB[m.id].n + "</em> for " + amount + ".", "good")
+    } else {
+      S.villain.dmg += amount
+      log(who(s) + " hits <em>Rhino</em> for " + amount + ".", "good")
+      if(S.villain.dmg >= stageHP() && S.villain.stage < STAGES.length-1){
+        S.villain.stage++; S.villain.dmg = 0
+        log("Rhino advances to <em>stage " + DB[STAGES[S.villain.stage].id].stage
+            + "</em>.", "bad")
+      }
+    }
+    floatAt(node, "−" + amount, "dmg")
+  } else {
+    // The main scheme carries no uid, so it must be matched by absence — a
+    // bare find on uid would otherwise match the first side scheme.
+    const sc = t.uid ? S.sides.find(x => x.uid === t.uid) : S.scheme
+    if(!sc){ reset(); draw(); return }
+    const was = sc.threat
+    sc.threat = Math.max(0, sc.threat - amount)
+    const name = sc === S.scheme ? SCHEME.n : DB[t.id].n
+    log(who(s) + " removes " + (was - sc.threat) + " threat from <em>" + name + "</em>.", "good")
+    if(sc !== S.scheme && sc.threat === 0){
+      S.sides = S.sides.filter(x => x !== sc)
+      log("<em>" + DB[t.id].n + "</em> is cleared.", "good")
+    }
+    floatAt(node, "−" + amount, "dmg")
+  }
+  exhaustSrc()
+  reset(); draw()
+}
+
+function reset(){
+  document.querySelectorAll(".card.acting").forEach(n => n.classList.remove("acting"))
+  P.mode = "idle"; P.src = null; P.action = null; P.targets = []; P.spent = []; P.cost = 0
+  document.body.classList.remove("picking")
+}
+function cancel(){ if(P.mode !== "idle"){ reset(); draw() } }
+
+/* ── Ending a turn ────────────────────────────────────────────────────────
+   With two heroes the player phase is two turns, then the villain phase. The
+   button already said which of those was about to happen. ─────────────── */
+function endTurn(){
+  if(P.busy) return
+  reset()
+  S.acted[S.active] = true
+  drawHand()
+
+  const nxt = nextSeat()
+  if(nxt != null){
+    S.active = nxt
+    const s = seat()
+    banner(heroDB(s).n + "'s turn", s.colour)
+    log("— " + heroDB(s).n + "'s turn —")
+    draw()
+    return
+  }
+  villainPhase()
+}
+/* Everything the hero draws back up to at the end of their own turn. */
+function drawHand(){
+  const s = seat(), size = heroDB(s).hs
+  s.hand.forEach(h => h.fresh = false)
+  while(s.hand.length < size && s.deck > 0){
+    s.deck--
+    s.hand.push({uid:"d"+Math.random().toString(36).slice(2,7),
+                 id:s.pool[Math.floor(Math.random()*s.pool.length)], fresh:true})
+  }
+}
+
+async function villainPhase(){
+  P.busy = true
+  S.phase = "villain"
+  draw()
+  banner("Villain phase", "var(--threat)")
+  await wait(900)
+
+  const v = DB[STAGES[S.villain.stage].id]
+
+  // 1. The villain activates once against each hero, in turn order.
+  for(const s of order()){
+    const h = heroDB(s)
+    if(s.form === "hero"){
+      say("Rhino attacks " + h.n + " for " + v.atk + ".", true)
+      s.dmg = Math.min(h.hp, s.dmg + v.atk)
+      log("Rhino attacks " + who(s) + " for <em>" + v.atk + "</em>.", "bad")
+    } else {
+      say("Rhino schemes for " + v.sch + ".", true)
+      S.scheme.threat = Math.min(target(), S.scheme.threat + v.sch)
+      log("Rhino schemes for <em>" + v.sch + "</em>.", "bad")
+    }
+    draw()
+    floatAt(seatNode(s), s.form === "hero" ? "−" + v.atk : "+" + v.sch,
+            s.form === "hero" ? "hurt" : "thr")
+    await wait(950)
+  }
+
+  // 2. Each minion activates against the hero it is engaged with.
+  for(const m of S.minions.slice()){
+    const mc = DB[m.id], s = S.seats[m.seat]
+    if(!s) continue
+    say(mc.n + " attacks " + heroDB(s).n + " for " + mc.atk + ".", true)
+    s.dmg = Math.min(heroDB(s).hp, s.dmg + mc.atk)
+    draw()
+    floatAt(seatNode(s), "−" + mc.atk, "hurt")
+    log(mc.n + " attacks " + who(s) + " for <em>" + mc.atk + "</em>.", "bad")
+    await wait(900)
+  }
+
+  // 3. The scheme accelerates — one per hero. This is the tick the front line
+  //    had been showing as a dashed segment all along.
+  say("The Break-In! gains " + accel() + " threat.", true)
+  S.scheme.threat = Math.min(target(), S.scheme.threat + accel())
+  draw()
+  floatAt(document.querySelector("#z-scheme .card"), "+" + accel(), "thr")
+  log("The Break-In! gains <em>" + accel() + "</em> threat.", "bad")
+  await wait(950)
+
+  // 4. One encounter card each.
+  say("Each hero is dealt an encounter card.", true)
+  S.enc.deck = Math.max(0, S.enc.deck - S.seats.length)
+  S.enc.disc += S.seats.length
+  draw()
+  log("Rhino reveals <em>Advance</em>.", "bad")
+  await wait(850)
+
+  // 5. New round: everyone readies, everyone draws up, first player passes.
+  S.round++
+  S.phase = "player"
+  S.acted = S.seats.map(() => false)
+  for(const s of S.seats){
+    s.exhausted = false
+    s.allies.forEach(a => a.exhausted = false)
+    s.supports.forEach(x => x.exhausted = false)
+  }
+  if(S.seats.length > 1){
+    const f = S.seats.findIndex(s => s.first)
+    S.seats.forEach(s => s.first = false)
+    S.seats[(f + 1) % S.seats.length].first = true
+    log("The first player token passes to "
+        + who(S.seats[(f + 1) % S.seats.length]) + ".")
+  }
+  S.active = S.seats.findIndex(s => s.first) < 0 ? 0 : S.seats.findIndex(s => s.first)
+  P.busy = false
+  banner("Round " + S.round, seat().colour)
+  draw()
+}
+/* Turn order starts at the first player and wraps. */
+function order(){
+  const f = Math.max(0, S.seats.findIndex(s => s.first))
+  return S.seats.slice(f).concat(S.seats.slice(0, f))
+}
+function seatNode(s){
+  const secs = document.querySelectorAll("#mine .seat")
+  return secs[s.i] ? secs[s.i].querySelector(".card") : null
+}
+
+/* ── Sheet ────────────────────────────────────────────────────────────── */
+function openSheet(which){
+  $("#tab-log").setAttribute("aria-selected", String(which === "log"))
+  $("#tab-set").setAttribute("aria-selected", String(which === "set"))
+  $("#pane-log").hidden = which !== "log"
+  $("#pane-set").hidden = which !== "set"
+  $("#sheet").classList.add("on"); $("#scrim").classList.add("on")
+  $("#sheet").setAttribute("aria-hidden","false")
+  $("#t-log").setAttribute("aria-expanded", String(which === "log"))
+  $("#t-set").setAttribute("aria-expanded", String(which === "set"))
+  if(which === "log") drawLog()
+}
+function closeSheet(){
+  $("#sheet").classList.remove("on"); $("#scrim").classList.remove("on")
+  $("#sheet").setAttribute("aria-hidden","true")
+  $("#t-log").setAttribute("aria-expanded","false")
+  $("#t-set").setAttribute("aria-expanded","false")
+}
+function toggleSheet(which){
+  const open = $("#sheet").classList.contains("on")
+  const cur = $("#tab-log").getAttribute("aria-selected") === "true" ? "log" : "set"
+  if(open && cur === which) closeSheet(); else openSheet(which)
+}
+
+/* The settings that were buried in four unlabelled rows inside the log
+   overlay, given names that say what they do. */
+const SETTINGS = [
+  ["Table", [
+    ["Card text on cards","Print rules text on cards small enough to sit in play",1],
+    ["Sort your hand","Keep hand cards in a fixed order instead of draw order",1],
+    ["Tilt cards under the pointer","A slight parallax on the card you are pointing at",0],
+  ]],
+  ["Two-handed play", [
+    ["Show the other hero's hand","Off keeps each hand hidden until that hero's turn",0],
+    ["Confirm before passing the turn","Ask before handing over, so a stray Enter costs nothing",1],
+  ]],
+  ["Sound", [
+    ["Music","",0],
+    ["Weather and effects","Rain, snow, and scenario atmosphere",1],
+  ]],
+  ["Automation", [
+    ["Choose targets for me","Skip the prompt when only one target is legal",1],
+    ["Trigger abilities for me","Resolve forced responses without asking",1],
+    ["Pause on reveal","Stop and show each encounter card as it is revealed",1],
+  ]],
+]
+function drawSettings(){
+  const p = $("#pane-set"); p.textContent = ""
+  for(const [title, rows] of SETTINGS){
+    if(title === "Two-handed play" && S.seats.length < 2) continue
+    const b = el("div","set-block")
+    const h = el("div","log-round")
+    const s = el("span"); s.textContent = title
+    h.appendChild(s); h.appendChild(el("hr")); b.appendChild(h)
+    for(const [name, note, on] of rows){
+      const r = el("div","set-row")
+      const l = el("label"); l.textContent = name
+      if(note){ const sm = el("small"); sm.textContent = note; l.appendChild(sm) }
+      const sw = el("button","sw"); sw.type = "button"; sw.setAttribute("role","switch")
+      sw.setAttribute("aria-checked", on ? "true" : "false")
+      sw.setAttribute("aria-label", name)
+      sw.addEventListener("click", () =>
+        sw.setAttribute("aria-checked", sw.getAttribute("aria-checked") === "true" ? "false" : "true"))
+      r.appendChild(l); r.appendChild(sw); b.appendChild(r)
+    }
+    p.appendChild(b)
+  }
+}
+
+/* ── Wiring ───────────────────────────────────────────────────────────── */
+$("#a-go").addEventListener("click", confirmAction)
+$("#a-cancel").addEventListener("click", cancel)
+$("#t-log").addEventListener("click", () => toggleSheet("log"))
+$("#t-set").addEventListener("click", () => toggleSheet("set"))
+$("#sheet-x").addEventListener("click", closeSheet)
+$("#scrim").addEventListener("click", closeSheet)
+$("#tab-log").addEventListener("click", () => openSheet("log"))
+$("#tab-set").addEventListener("click", () => openSheet("set"))
+$("#t-undo").disabled = true
+
+for(const [id, label] of [["p-deck","this hero's deck"],["p-disc","this hero's discard"],
+                          ["enc-deck","the encounter deck"],["enc-disc","the encounter discard"]]){
+  $("#"+id).addEventListener("click", () => say("Browsing " + label + " — click anywhere to close."))
+}
+
+/* The log used to be on Tab, which costs you keyboard navigation for the whole
+   board. It is on L instead, and Tab does what Tab does. */
+document.addEventListener("keydown", e => {
+  if(e.metaKey || e.ctrlKey || e.altKey) return
+  if(e.key === "l" || e.key === "L"){ toggleSheet("log"); return }
+  if(e.key === "Escape"){ if($("#sheet").classList.contains("on")) closeSheet(); else cancel(); return }
+  if(e.key === "Enter"){
+    if(document.activeElement && document.activeElement.closest(".ask")) return
+    e.preventDefault(); confirmAction()
+  }
+})
+
+/* Seed the log so the sheet opens onto a game already in progress. */
+S.log = S.seats.length > 1 ? [
+  {id:36, round:3, text:'<u style="--w:var(--s1)">Captain America</u> plays <em>Quinjet</em> for 1.', kind:"good"},
+  {id:37, round:3, text:'<u style="--w:var(--s2)">She-Hulk</u> hits <em>Rhino</em> for 3.', kind:"good"},
+  {id:38, round:3, text:'Rhino attacks <u style="--w:var(--s1)">Captain America</u> for <em>2</em>.', kind:"bad"},
+  {id:39, round:3, text:"The Break-In! gains <em>2</em> threat.", kind:"bad"},
+  {id:40, round:4, text:'<em>Shocker</em> engages <u style="--w:var(--s2)">She-Hulk</u>.', kind:"bad"},
+] : [
+  {id:36, round:2, text:'<u style="--w:var(--s1)">Captain America</u> plays <em>Quinjet</em> for 1.', kind:"good"},
+  {id:37, round:2, text:'<u style="--w:var(--s1)">Captain America</u> thwarts <em>The Break-In!</em> for 2.', kind:"good"},
+  {id:38, round:2, text:'Rhino attacks <u style="--w:var(--s1)">Captain America</u> for <em>2</em>.', kind:"bad"},
+  {id:39, round:2, text:"The Break-In! gains <em>1</em> threat.", kind:"bad"},
+  {id:40, round:3, text:'<em>Hydra Mercenary</em> engages <u style="--w:var(--s1)">Captain America</u>.', kind:"bad"},
+]
+document.documentElement.dataset.seats = S.seats.length
+drawSettings()
+draw()
+</script>
+</body>
+</html>

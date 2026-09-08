@@ -9,6 +9,7 @@ from engine.lib import MimeType, Json, Ver
 from engine.log import Log
 from engine.file import FileManager
 import hashlib
+import re
 
 CATEGORY_NAME = "WEB"
 
@@ -191,6 +192,31 @@ class WebServer:
             return web.json_response({})
 
     @final
+    def StampAssetVersions(self, html: bytes) -> bytes:
+        """Adds `?v=<app version>` to the stylesheets and scripts a page names.
+
+        Card art is content-addressed - `/01094` is that picture forever - so
+        it keeps the year-long cache. Code is not: `play.css` at the same URL
+        means something different after every edit, and a browser that cached
+        it has no way to find out. The version already changes on every build
+        and is already the thing the client checks its cookie against, so it
+        is the right cache key.
+
+        Left alone: anything already carrying a query, and anything off-site
+        (the font CDN), which is versioned by its own URL.
+        """
+        version = Ver.ui_version_str
+        if not version:
+            return html
+
+        def stamp(match: "re.Match[bytes]") -> bytes:
+            return b'%s="%s?v=%s"' % (
+                match.group(1), match.group(2), version.encode('utf-8'))
+
+        return re.sub(
+            rb'(src|href)="(/public/[^"?#]+\.(?:js|css))"', stamp, html)
+
+    @final
     def ReadFile(self, file_path: str, find_paths: List[str]=[]) -> web.Response:
         if file_path.startswith("/"):
             file_path = "." + file_path
@@ -217,7 +243,28 @@ class WebServer:
             found_path = find_path(file_path)
             data = read_file(found_path, True)
             mime_type = MimeType.GetMimeType(file_path)
-            if Build.release:
+
+            if mime_type == 'text/html':
+                # A page is the entry point and its URL carries no version -
+                # '/' is '/' forever. Cached for a year it would keep serving
+                # whichever page was there the first time the browser saw it,
+                # so switching a route, or shipping any change to a page,
+                # could never reach anyone who had already visited. Pages are
+                # a few KB; revalidate them.
+                data = self.StampAssetVersions(data)
+                header = {'Cache-Control': 'no-cache'}
+            elif mime_type in ('application/javascript', 'text/css'):
+                # Code, unlike card art, means something different at the
+                # same URL after every edit. The version stamp only helps if
+                # the version moved, and a stylesheet fixed between builds
+                # would otherwise never reach a browser that already had one.
+                # Scripts have it worse: a module imports its own siblings -
+                # `./cards.js` from `marvel.js` - and those specifiers resolve
+                # without the query, so no amount of stamping can version the
+                # graph beneath the entry point. Both revalidate. They are
+                # small and this server is on loopback.
+                header = {'Cache-Control': 'no-cache'}
+            elif Build.release:
                 header = self.HeaderCache
             else:
                 header = {}
@@ -273,9 +320,16 @@ class WebServer:
             return response
 
         async def handle_get_version(request: web.Request) -> web.Response:
-            # response = web.Response(text=Ver.ui_version_str)
-            # Hack, make browser treat it as images and store in cache
-            response = web.Response(body=Ver.ui_version_str, content_type='image/jpeg', headers=self.HeaderCache)
+            # This is the one endpoint that must never be cached. Its whole job
+            # is to say whether the build moved, and it also carries the cookie
+            # every other route is checked against - so a cached copy pins the
+            # browser to an old version permanently and no reload can rescue
+            # it. That is what the "Version Mismatch, try Empty Cache and Hard
+            # Reload" page was really reporting.
+            response = web.Response(
+                body=Ver.ui_version_str,
+                content_type='text/plain',
+                headers={'Cache-Control': 'no-store'})
             response.set_cookie(
                 'app_version',
                 Ver.ui_version_str,

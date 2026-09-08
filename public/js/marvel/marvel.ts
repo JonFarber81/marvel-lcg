@@ -76,6 +76,13 @@ Button.doShow()
 
 // Usage
 SwipeDetector.attachSwipeListeners();
+// The play view is opted into by the page, so the classic screen is
+// untouched. It has to be in place before the first world arrives.
+if( (window as any).NEW_VIEW ) {
+    const { View } = await import('./view.js')
+    View.init()
+}
+
 Client.doConnect()
 
 AutoActivate.loadConfig(true)
