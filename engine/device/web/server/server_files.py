@@ -11,10 +11,16 @@ CATEGORY_NAME = "WEB"
 class GameServerFiles(GameServerBase):
 
     async def handle_marvel(self, request: web.Request) -> web.StreamResponse:
+        # Every way into a game - the setup screen, Continue on the menu, a
+        # join link, the tutorial, a replay - lands on '/' with a query. That
+        # is the gameplay screen, and it is now the new board. '?classic'
+        # still reaches the old one, so a game can be compared or fallen back
+        # to without touching any of the links that lead here.
         if request.query_string == '':
             return self.ReadFile('./public/main.html')
-        else:
+        if 'classic' in request.query:
             return self.ReadFile('./public/marvel.html')
+        return self.ReadFile('./public/play.html')
 
     async def handle_players_404(self, request: web.Request) -> web.StreamResponse:
         player = request.match_info.get('player')

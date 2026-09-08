@@ -29,7 +29,24 @@ class CardRender {
     public static lastRightClickTimes = new Map()
     private static control_by_player_classes = Array.from({ length: 5 }, (_, i) => `control_player_${i}`);
 
-    private static area_names: string[] = [
+    /* The play view gives every hero their own board, so each seat gets its
+       own containers instead of the four shared `player-all-*` ones. The
+       classic screen keeps the shared list. */
+    static get area_names(): string[] {
+        if( !(window as any).NEW_VIEW ) return CardRender.base_area_names
+        const names = CardRender.base_area_names.filter(n => !n.startsWith('player-all-'))
+        const total = Game.world_descriptor?.players?.length ?? 0
+        for( let i=0; i<total; i++ ) {
+            names.push(`player-${i}-area-hero`)
+            names.push(`player-${i}-allies`)
+            names.push(`player-${i}-supports`)
+            names.push(`player-${i}-engaged-minions`)
+            names.push(`player-${i}-hand-cards`)
+        }
+        return names
+    }
+
+    private static base_area_names: string[] = [
         'victory-display',
         'removed-pool',
 
@@ -567,11 +584,28 @@ class CardRender {
 
         CardRender.print_cards_objs['victory-display'] = Game.world_descriptor.victory_display
 
+        // The play view keeps each hero's board separate; the classic screen
+        // pools everyone into one row per kind.
+        const per_seat = !!(window as any).NEW_VIEW
         CardRender.print_cards_objs[`player-all-hand-cards`]      = []
         CardRender.print_cards_objs[`player-all-area-hero`]       = []
         CardRender.print_cards_objs[`player-all-allies`]          = []
         CardRender.print_cards_objs[`player-all-supports`]        = []
         CardRender.print_cards_objs[`player-all-engaged-minions`] = []
+        if( per_seat ) {
+            for( let i=0; i<Game.world_descriptor.players.length; i++ ) {
+                const p = Game.world_descriptor.players[i]
+                CardRender.print_cards_objs[`player-${i}-hand-cards`]      = p.hand_cards
+                CardRender.print_cards_objs[`player-${i}-allies`]          = p.allies
+                CardRender.print_cards_objs[`player-${i}-supports`]        = p.supports
+                CardRender.print_cards_objs[`player-${i}-engaged-minions`] = p.engaged_enemies
+                CardRender.print_cards_objs[`player-${i}-area-hero`]       = []
+                CardRender.print_cards_objs[`player-${i}-area-hero`].push(...p.area_hero)
+                CardRender.print_cards_objs[`player-${i}-area-hero`].push(...p.dealt_encounter_cards)
+                CardRender.print_cards_objs[`player-${i}-area-hero`].push(...p.environment_area)
+                CardRender.print_cards_objs[`player-${i}-area-hero`].push(...p.obligations_area)
+            }
+        }
         for( let i=0; i<Game.world_descriptor.players.length; i++ ) {
             CardRender.print_cards_objs[`player-all-hand-cards`].push          (...Game.world_descriptor.players[i].hand_cards)
             CardRender.print_cards_objs[`player-all-area-hero`].push           (...Game.world_descriptor.players[i].area_hero)
@@ -1193,6 +1227,9 @@ class CardRender {
     }
 
     static printCards() {
+        // The play view builds the containers this loop is about to query.
+        // Registered on `window` so this module never has to import it.
+        ;(window as any).PlayView?.beforeRenderSafe?.()
         CardRender.updateCardsData()
 
         UI.anime_move_cards_count = 0
@@ -1232,6 +1269,8 @@ class CardRender {
         // CardRender.stat_do_render2 = []
 
         CardAnimation.setAnimeTimeEnd()
+
+        ;(window as any).PlayView?.update?.()
 
         return
     }

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- The client fetches its endpoints relatively (`get_world?p=0`), and sets
+     card art as `url("01094")` in inline styles. This page is served out of
+     /public/, so without a base every one of those would resolve into the
+     static-file handler and come back as a JPEG. -->
+<base href="/">
+<script src="/public/js/version_guard.js"></script>
+<meta name="viewport" content="width=device-width,height=device-height,viewport-fit=cover,initial-scale=1,maximum-scale=1,user-scalable=0">
+<meta name="theme-color" content="#0B0C11">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Marvel Champions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/public/css/play/play.css">
+<script>window.NEW_VIEW = true</script>
+</head>
+
+<body class="hide-auto-activate">
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     The board.
+     `#camera` and `#scene` are `display:contents`, so the client's scene
+     code can keep hold of them while the zones inside take part in the
+     page's own grid.
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="table">
+
+  <header class="rail">
+    <a class="rail-back" href="/">&#8592;&nbsp; Menu</a>
+    <div class="rail-id" id="rail-id"><b>Marvel Champions</b></div>
+    <div class="rail-tools">
+      <button class="tool" id="t-undo" type="button">Undo<kbd>&#8984;Z</kbd></button>
+      <button class="tool" id="t-log" type="button">Log<kbd>L</kbd></button>
+      <button class="tool" id="t-set" type="button">Settings</button>
+    </div>
+  </header>
+
+  <div id="camera"><div id="scene">
+
+    <!-- ═══ The villain's half ═══════════════════════════════════════ -->
+    <section class="field enemy" id="enemy">
+      <div class="zone">
+        <div class="zone-head"><span class="eyebrow">Villain</span></div>
+        <div class="lane area area-center" id="area-villain" data-empty="—"></div>
+      </div>
+      <div class="zone">
+        <div class="zone-head"><span class="eyebrow">Main scheme</span></div>
+        <div class="lane area area-schemes" id="area-schemes-main" data-empty="—"></div>
+      </div>
+      <div class="zone">
+        <div class="zone-head"><span class="eyebrow">Side schemes</span></div>
+        <div class="lane area area-schemes" id="area-schemes-side" data-empty="None in play"></div>
+      </div>
+      <div class="zone">
+        <div class="zone-head"><span class="eyebrow">Engaged</span></div>
+        <div class="engaged" id="engaged"></div>
+      </div>
+      <div class="zone">
+        <div class="zone-head"><span class="eyebrow">Resolving</span></div>
+        <div class="lane area" id="area-play" data-empty="Nothing"></div>
+      </div>
+      <div class="zone pushed">
+        <div class="zone-head"><span class="eyebrow">Encounter</span></div>
+        <div class="lane sm">
+          <button class="stack enc facedown" id="stack-encounter-deck-0" type="button">
+            <div class="deck deck-top encounter-deck" id="encounter-deck-0"></div>
+            <div class="stack-label">
+              <span class="stack-n mono" id="n-encounter-deck-0">0</span>
+              <span class="stack-l">Deck</span>
+            </div>
+          </button>
+          <button class="stack" id="stack-encounter-discard-pile-0" type="button">
+            <div class="deck encounter-discard-pile" id="encounter-discard-pile-0"></div>
+            <div class="stack-label">
+              <span class="stack-n mono" id="n-encounter-discard-pile-0">0</span>
+              <span class="stack-l">Discard</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ The front line ═══════════════════════════════════════════
+         The two clocks the game is a race between, drawn as the divider
+         itself. -->
+    <div class="front" id="front">
+      <div class="side l">
+        <div class="side-head">
+          <span class="side-name" id="f-vname">&nbsp;</span>
+          <span class="side-num mono" id="f-vnum"></span>
+        </div>
+        <div class="track" id="f-vtrack"></div>
+        <div class="side-head"><span class="side-sub" id="f-vsub"></span></div>
+      </div>
+
+      <div class="clock">
+        <div class="clock-r"><span>Round</span><b id="f-round">0</b></div>
+        <div class="clock-p" id="f-phase"></div>
+      </div>
+
+      <div class="side r">
+        <div class="side-head">
+          <span class="side-num mono" id="f-snum"></span>
+          <span class="side-name" id="f-sname">&nbsp;</span>
+        </div>
+        <div class="track" id="f-strack"></div>
+        <div class="side-head"><span class="side-sub" id="f-ssub"></span></div>
+      </div>
+    </div>
+
+    <!-- ═══ The heroes' half — one board per seat, built by view.ts ═══ -->
+    <section class="field mine" id="mine"></section>
+
+  </div></div><!-- /scene /camera -->
+
+  <!-- ═══ Dock ═══════════════════════════════════════════════════════ -->
+  <footer class="dock" id="dock">
+    <div class="piles" id="piles"></div>
+
+    <div class="hand-wrap">
+      <div class="hand-head">
+        <span class="who" id="hand-who"></span>
+        <span class="eyebrow">Hand</span>
+        <span class="zone-n mono" id="n-hand"></span>
+      </div>
+      <div id="hands" style="display:contents"></div>
+    </div>
+
+    <div class="ask" id="ask">
+      <p class="ask-text" id="ask-text"><span></span></p>
+      <p class="ready" id="ready"></p>
+      <div class="pay" id="pay" hidden>
+        <span class="pay-l" id="pay-l">Pay</span>
+        <span class="pay-pips" id="pay-pips"></span>
+      </div>
+      <!-- The client's own ability buttons are moved in here on init. -->
+      <div id="opts-slot"></div>
+      <div class="acts">
+        <button class="act ghost" id="a-cancel" type="button" hidden>Cancel</button>
+        <button class="act primary" id="a-go" type="button">Waiting</button>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<!-- ═══ Preview — the client's own hover panels, dressed ═══════════════ -->
+<div id="image-preview-div-left" class="image-preview-div hide display-none">
+  <div class="image-preview"><div class="image-preview-text"></div></div>
+  <div class="image-preview-name"></div>
+  <div class="image-preview-debug-text debug-only"></div>
+</div>
+<div id="image-preview-div-right" class="image-preview-div hide display-none">
+  <div class="image-preview"><div class="image-preview-text"></div></div>
+  <div class="image-preview-name"></div>
+  <div class="image-preview-debug-text debug-only"></div>
+</div>
+<div id="image-preview-div-center" class="image-preview-div hide display-none">
+  <div class="image-preview"><div class="image-preview-text"></div></div>
+  <div class="image-preview-name"></div>
+  <div class="image-preview-debug-text debug-only"></div>
+</div>
+
+<!-- ═══ Sheet — the log and the settings ══════════════════════════════ -->
+<div class="scrim" id="scrim"></div>
+<aside class="sheet" id="sheet">
+  <div class="sheet-head">
+    <button class="sheet-tab" id="tab-log" type="button" aria-selected="true">Log</button>
+    <button class="sheet-tab" id="tab-set" type="button" aria-selected="false">Settings</button>
+    <button class="sheet-x" id="sheet-x" type="button" aria-label="Close">&times;</button>
+  </div>
+
+  <div class="sheet-body" id="pane-log">
+    <!-- The client writes the log into `#history-text` and opens a context
+         menu from `#contextMenu`; both keep working, shown by the sheet
+         rather than by its own full-screen overlay. -->
+    <div id="history">
+      <div id="history-text"></div>
+      <div id="contextMenu" class="hide">
+        <button id="view_in_mdb" type="button" onclick="HistoryLog.gotoMDB(this)">View on MarvelCDB</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-body" id="pane-set" hidden>
+    <!-- `Button.initializeButtons` appends the real settings into these four
+         rows. They were four unlabelled rows buried inside the log overlay. -->
+    <div id="ex-buttons">
+      <div class="set-block">
+        <div class="set-title"><span>Table</span><hr></div>
+        <div class="set-actions" id="ex-buttons-1"></div>
+      </div>
+      <div class="set-block">
+        <div class="set-title"><span>Presentation</span><hr></div>
+        <div class="set-actions" id="ex-buttons-2"></div>
+      </div>
+      <div class="set-block">
+        <div class="set-title"><span>Save and load</span><hr></div>
+        <div class="set-actions" id="ex-buttons-3"></div>
+      </div>
+      <div class="set-block">
+        <div class="set-title"><span>Automation</span><hr></div>
+        <div class="set-actions" id="ex-buttons-4"></div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ═══ Moments ═══════════════════════════════════════════════════════ -->
+<div id="message-overlay"><div id="message-text" class="message-text"></div></div>
+<div id="achievement-bar" class="remove"></div>
+<div class="notifications"></div>
+
+<div id="lost-connect" class="lost-connect hide">
+  <p id="wait-connect">Reconnecting in <span id="retry-timer">1</span>s. <a id="reconnect-link">Reconnect now</a></p>
+  <p id="connecting">Connecting…</p>
+  <p id="manual-connect"><a id="reconnect-link2">Reconnect now</a></p>
+</div>
+
+<div id="game-over-box-container">
+  <div id="game-over-box">
+    <div id="game-over-message">
+      <div id="game-over-text" class="message-text"></div>
+      <div id="game-over-text-2"></div>
+      <div id="game-over-buttons"></div>
+      <div id="session-statistics-container"><table id="session-statistics"></table></div>
+    </div>
+    <div id="game-over-close"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     The client reads its own state back out of these. They have to exist and
+     keep working; the dock mirrors the ones you need to see, and forwards
+     clicks back to them.
+     ═══════════════════════════════════════════════════════════════════ -->
+<div id="legacy">
+  <textarea name="data" id="selected-data" rows="4" readonly>{}</textarea>
+
+  <div id="option-buttons"></div>
+  <button id="btn-end" class="button" onclick="Button.doBtnCancel()" disabled></button>
+  <button id="btn-ok" class="button ok" onclick="Button.doBtnOk()" disabled>OK</button>
+
+  <div id="prompt-box-container" class="hide draggable">
+    <div id="prompt-box-close">&times;</div>
+    <div id="prompt-box-lock" class="locked"></div>
+    <div id="prompt-text"></div>
+  </div>
+
+  <div class="resources" id="player-all-resources"></div>
+
+  <div id="left-side-bar" class="side-bar"></div>
+  <div id="right-side-bar" class="side-bar">
+    <input type="range" min="0" max=".4" value=".2" step="0.05" class="slider" id="anime-time">
+    <input type="range" min="100" max="1500" value="600" class="slider hide" id="delay-range">
+    <input type="range" min="-5" max="5" value=".5" step="0.1" class="slider hide" id="hand-card-margin">
+    <input type="range" min="-5" max="5" value=".5" step="0.1" class="slider hide" id="hand-card-margin-bottom">
+    <input type="range" min="-100" max="100" value="0" class="slider hide" id="hand-card-total-deg">
+  </div>
+
+  <div id="top-bar"><span id="turn-id"></span></div>
+  <div id="phase" class="hide"></div>
+  <div class="overlay" id="version"></div>
+  <div id="overlay-icon">
+    <div id="replay-icon"></div>
+    <div class="hide" id="skipping-icon"></div>
+    <div id="pause-icon"></div>
+  </div>
+  <output id="current-round"></output>
+  <input type="range" min="1" max="1" value="0" step="1" class="slider" id="goto-id">
+  <iframe id="weather-background" src=""></iframe>
+  <audio id="play-bgm" src="" preload="auto" controls="none" loop></audio>
+
+  <!-- Containers the client renders into that this design has no place for.
+       They must exist, or the cards in them vanish silently. -->
+  <div class="deck deck-top" id="victory-display"></div>
+  <div class="deck deck-top" id="removed-pool"></div>
+  <div class="deck deck-top" id="area-removed"></div>
+  <div class="deck deck-top" id="nemesis-pool"></div>
+  <div class="deck deck-top" id="area-advanced"></div>
+  <div class="area" id="area-rule"></div>
+  <div class="deck deck-top encounter-deck" id="encounter-deck-1"></div>
+  <div class="deck deck-top encounter-deck" id="encounter-deck-2"></div>
+  <div class="deck deck-top encounter-deck" id="encounter-deck-3"></div>
+  <div class="deck encounter-discard-pile" id="encounter-discard-pile-1"></div>
+  <div class="deck encounter-discard-pile" id="encounter-discard-pile-2"></div>
+  <div class="deck encounter-discard-pile" id="encounter-discard-pile-3"></div>
+
+  <div class="player-background player-0 hide-player"></div>
+  <div class="player-background player-1 hide-player"></div>
+  <div class="player-background player-2 hide-player"></div>
+  <div class="player-background player-3 hide-player"></div>
+
+  <div id="player-mouse-0"></div>
+  <div id="player-mouse-1"></div>
+  <div id="player-mouse-2"></div>
+  <div id="player-mouse-3"></div>
+
+  <div id="debug-window" class="hide-background debug-only hide"></div>
+</div>
+
+<script src="/public/js/lib/vanilla-tilt.js"></script>
+<script src="/public/js/lib/click-effect.js"></script>
+<script src="/public/js/marvel/marvel.js" type="module"></script>
+<script src="/public/js/marvel/draggable.js" type="module"></script>
+</body>
+</html>

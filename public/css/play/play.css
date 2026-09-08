@@ -1,0 +1,1479 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   play.css — the whole look of the gameplay screen, in one file.
+
+   This replaces the sixty stylesheets marvel.html loads. It dresses the card
+   DOM the existing client already builds (`.card > .face > .image`, `.info`,
+   `.info_pay`, …) rather than asking that client to build something new, so
+   every animation, diff and highlight the engine drives keeps working.
+
+   Two rules run through the whole thing:
+
+     1. Nothing is ever drawn across a card's face. The illustration and the
+        rules text are what the card is; everything the game adds lives on the
+        edges — what it can still take along the bottom, what has been done to
+        it along the top.
+
+     2. Colour has exactly one job: whose is this. Warm is the encounter side
+        and never anything else. The seats are cool and one each.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root{
+  --ink:#0B0C11;
+  --panel:#13151D;
+  --panel-2:#1A1D27;
+  --panel-3:#232733;
+  --rule:#282D3A;
+  --rule-soft:#1E222C;
+  --text:#E9EBF1;
+  --dim:#A2A8BA;
+  --muted:#767D92;
+  --faint:#4E5568;
+
+  /* Sampled from the villain's artwork and folded into the warm band. */
+  --threat:#C9333E;
+
+  /* Seats. Four cool hues, far enough apart to tell at a glance and far
+     enough from the villain's half that none is mistaken for it. */
+  --s0:#4B8DF8;
+  --s1:#39C2A4;
+  --s2:#A98BF5;
+  --s3:#E2A33F;
+  --seat:var(--s0);
+  /* The heroes together. The front line's left bar is damage the table has
+     done, which does not change when the turn passes — so it must not change
+     colour when the turn passes either. */
+  --team:#8AA6D6;
+
+  --res-b:#7C93D6;   /* mental   */
+  --res-r:#E0705F;   /* physical */
+  --res-y:#E6BD48;   /* energy   */
+  --res-g:#4FC26B;   /* wild     */
+  --hurt:#E5484D;
+
+  --f-display:"Big Shoulders Display","Big Shoulders",Impact,Haettenschweiler,sans-serif;
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ease:cubic-bezier(.22,.61,.36,1);
+
+  --ratio:.716;
+  --ch-lg:clamp(112px,21vh,200px);
+  --ch-md:clamp(88px,16.5vh,156px);
+  --ch-sm:clamp(68px,12vh,114px);
+  --ch-hand:clamp(118px,17.5vh,186px);
+
+  --rail:42px;
+  --line:62px;
+  --dock:calc(var(--ch-hand) + 64px);
+
+  /* MoveCard reads these once at module load; they must exist or its maths
+     turns into NaN. Nothing here lays out from them. */
+  --card-width:127px;
+  --card-height:176px;
+  --font-size:26px;
+  --font-size-out:16px;
+
+  /* Animation timings the client also uses as JS setTimeout values. */
+  --anime-time:.2s;
+  --anime-move-time:.2s;
+  --anime-shuffle-time:.1s;
+  --anime-time-card:.2s;
+}
+:root[data-seats="2"]{
+  --ch-lg:clamp(96px,17vh,166px);
+  --ch-md:clamp(78px,13.5vh,132px);
+  --ch-sm:clamp(56px,9.5vh,94px);
+}
+:root[data-seats="3"],:root[data-seats="4"]{
+  --ch-lg:clamp(84px,13.5vh,132px);
+  --ch-md:clamp(68px,11vh,106px);
+  --ch-sm:clamp(50px,8vh,78px);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--ink);
+  color:var(--text);
+  font-family:var(--f-ui);
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+button{background:none;border:none;cursor:pointer;font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+.hide,.display-none,[hidden]{display:none !important}
+:focus-visible{outline:2px solid var(--seat);outline-offset:2px;border-radius:2px}
+
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{
+  font-family:var(--f-mono);
+  font-size:9px;
+  font-weight:600;
+  letter-spacing:.17em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+}
+
+/* ═══ The legacy chrome ══════════════════════════════════════════════════
+   The client reads its own state back out of these elements, so they have to
+   exist and keep working. They are not what you look at: the dock mirrors
+   them. `#option-buttons` is the exception — the client fills it with the
+   real ability buttons, so it is moved into the dock and dressed, not
+   hidden. */
+#legacy{position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden}
+#legacy *{pointer-events:none}
+
+/* ═══ Shell ══════════════════════════════════════════════════════════════ */
+/* scene.ts writes `display` straight onto #camera, so the board's own
+   layout has to win. `display:contents` lets the zones inside take part in
+   the page grid while the client keeps its handle on the element. */
+#camera,#scene{display:contents !important}
+.table{
+  display:grid;
+  grid-template-rows:var(--rail) minmax(0,1fr) var(--line) minmax(0,1fr) var(--dock);
+  height:100vh;
+  height:100dvh;
+}
+
+/* ═══ Rail ═══════════════════════════════════════════════════════════════ */
+.rail{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  padding:0 16px;
+  background:var(--panel);
+  border-bottom:1px solid var(--rule);
+  z-index:6;
+}
+.rail-back{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:14px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted);
+  transition:color .15s var(--ease);
+}
+.rail-back:hover{color:var(--text)}
+.rail-id{
+  display:flex;
+  align-items:baseline;
+  gap:9px;
+  font-family:var(--f-mono);
+  font-size:10.5px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--faint);
+}
+.rail-id b{font-weight:600;color:var(--dim)}
+.rail-tools{margin-left:auto;display:flex;align-items:center;gap:3px}
+.tool{
+  padding:6px 11px 7px;
+  border-radius:2px;
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:14px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--muted);
+  transition:background .14s var(--ease),color .14s var(--ease);
+}
+.tool:hover:not(:disabled){background:var(--panel-2);color:var(--text)}
+.tool:disabled{color:#353B4A;cursor:not-allowed}
+.tool kbd{font-family:var(--f-mono);font-size:8.5px;font-weight:500;letter-spacing:0;color:var(--faint);margin-left:5px}
+
+/* ═══ Territories ════════════════════════════════════════════════════════ */
+.field{position:relative;display:flex;min-height:0}
+.field.enemy{
+  align-items:flex-end;
+  padding:0 16px 12px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+}
+.field.enemy::-webkit-scrollbar{height:7px}
+.field.enemy::-webkit-scrollbar-thumb{background:var(--panel-3);border-radius:4px}
+.field.enemy::before{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:0;
+  height:74%;
+  pointer-events:none;
+  background:linear-gradient(to top,color-mix(in srgb,var(--threat) 9%,transparent),transparent);
+}
+
+/* ═══ Zones ══════════════════════════════════════════════════════════════ */
+.zone{
+  position:relative;
+  z-index:1;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:0 14px;
+  border-left:1px solid var(--rule-soft);
+  flex:0 0 auto;
+  min-width:0;
+}
+.zone:first-child{border-left:none;padding-left:0}
+.zone.grow{flex:1 1 auto}
+.zone.pushed{margin-left:auto;border-left:none}
+.field.mine .zone{flex-direction:column-reverse}
+.zone-head{display:flex;align-items:baseline;gap:8px;height:13px}
+.zone-n{font-family:var(--f-mono);font-size:9px;color:var(--faint)}
+
+/* A lane is one of the client's own card containers, laid out in flow rather
+   than by absolute transforms. Every lane is as tall as the tallest thing
+   that can stand in it, so the zone labels land on one line. */
+.lane{
+  display:flex;
+  align-items:flex-end;
+  gap:7px;
+  height:var(--ch-lg);
+  min-width:0;
+}
+.field.mine .lane{align-items:flex-start}
+.lane.attached{gap:3px}
+.lane.sm{height:var(--ch-md)}
+.lane:empty::after,.lane.is-empty::after{
+  content:attr(data-empty);
+  align-self:flex-end;
+  padding:0 8px 3px 0;
+  font-size:11.5px;
+  color:#3C4356;
+  white-space:nowrap;
+}
+.field.mine .lane:empty::after,.field.mine .lane.is-empty::after{align-self:flex-start;padding:3px 8px 0 0}
+
+/* Enemies are grouped by the hero they are engaged with — one small lane per
+   seat, each under that hero's name in that hero's colour. */
+.engaged{display:flex;gap:12px}
+.engaged-seat{display:flex;flex-direction:column;gap:6px;min-width:0}
+.engaged-name{
+  font-family:var(--f-mono);
+  font-size:9px;
+  font-weight:600;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--s);
+  white-space:nowrap;
+}
+
+/* ═══ Seats ══════════════════════════════════════════════════════════════
+   One person plays every hand, so every board is on screen at full size.
+   What changes with the turn is only which seat is lit: the active seat's
+   edge of the front line glows in its colour, so the line says whose turn it
+   is at the point where their country meets it. */
+.field.mine{align-items:stretch;padding:0}
+.seat{
+  position:relative;
+  flex:1 1 0;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  border-left:1px solid var(--rule);
+}
+.seat:first-child{border-left:none}
+.seat::before{
+  content:"";
+  position:absolute;
+  left:0;right:0;top:0;
+  height:2px;
+  background:transparent;
+  transition:background .25s var(--ease);
+  z-index:2;
+}
+.seat.on::before{background:var(--s)}
+.seat::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;top:0;
+  height:74%;
+  pointer-events:none;
+  opacity:0;
+  background:linear-gradient(to bottom,color-mix(in srgb,var(--s) 13%,transparent),transparent);
+  transition:opacity .25s var(--ease);
+}
+.seat.on::after{opacity:1}
+.seat.eliminated{opacity:.4}
+
+.seat-lanes{
+  position:relative;
+  z-index:1;
+  flex:0 0 auto;
+  display:flex;
+  align-items:flex-start;
+  min-height:0;
+  padding:12px 14px 0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+}
+.seat-lanes::-webkit-scrollbar{height:7px}
+.seat-lanes::-webkit-scrollbar-thumb{background:var(--panel-3);border-radius:4px}
+
+/* The nameplate answers, for each hero, what you keep having to ask: who,
+   how hurt, how many cards, and who goes first. */
+.plate{
+  position:relative;
+  z-index:1;
+  flex:0 0 auto;
+  display:flex;
+  align-items:baseline;
+  gap:11px;
+  padding:7px 14px 11px;
+  min-width:0;
+}
+.plate-name{
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:19px;
+  line-height:1;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  transition:color .2s var(--ease);
+}
+.seat.on .plate-name{color:var(--text)}
+.plate-form{
+  font-family:var(--f-mono);
+  font-size:8px;
+  font-weight:600;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--faint);
+  white-space:nowrap;
+}
+.plate-hp{font-family:var(--f-mono);font-size:11px;font-weight:600;color:var(--s);white-space:nowrap}
+.plate-meta{
+  font-family:var(--f-mono);
+  font-size:9px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.plate-first{
+  padding:1px 5px 2px;
+  border-radius:2px;
+  background:var(--panel-3);
+  font-family:var(--f-mono);
+  font-size:8px;
+  font-weight:600;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--dim);
+}
+/* The seat's resource pool, while it is paying for something. */
+.plate-res{display:flex;gap:3px;align-items:center}
+.plate-res div{width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 1.5px rgba(11,12,17,.8)}
+
+/* ═══ Card ═══════════════════════════════════════════════════════════════
+   The client builds `.card > .face > .image` and hangs `.info`, `.info_pay`
+   and `.bind-image-info` off it. All of that is kept; it is simply dressed
+   so that the picture is the card and the state is on the edges. */
+.card{
+  position:relative;
+  flex:0 0 auto;
+  width:calc(var(--h) * var(--ratio));
+  height:var(--h);
+  --h:var(--ch-md);
+  border-radius:4px;
+  background:var(--panel-2);
+  cursor:pointer;
+  user-select:none;
+  transition:transform .16s var(--ease),box-shadow .16s var(--ease),opacity .16s var(--ease);
+}
+.lane > .card{--h:var(--ch-lg)}
+.lane.sm > .card{--h:var(--ch-md)}
+.card.tiny{--h:var(--ch-sm)}
+/* Attached to something: an upgrade on a hero, a Charge on the villain, a
+   Stunned card on a minion. Drawn a size down, so the thing it is attached to
+   still reads as the subject. */
+.lane > .card.bound{--h:var(--ch-md)}
+.lane.attached > .card.bound{--h:var(--ch-sm)}
+/* A card tucked under someone sits after them, not in front of them. Only
+   where a lane holds a single host - the villain, and each hero's identity -
+   because elsewhere it would gather every ally's upgrades at the far end. */
+#area-villain > .card.bound,
+.lane.attached > .card.bound{order:1}
+
+.card .face{
+  position:absolute;
+  inset:0;
+  border-radius:4px;
+  overflow:hidden;
+  background:var(--panel-3);
+}
+.card .image{position:absolute;inset:0}
+.card .image::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-image:var(--bg-image);
+  background-size:100% 100%;
+  background-repeat:no-repeat;
+}
+/* A scheme is printed on its side. The server stands every landscape image
+   up before it sends it, so it is laid back down here: the box keeps the
+   card's height as its width, and the picture takes a quarter turn. */
+.card.type-main-scheme,
+.card.type-encounter-side-scheme,
+.card.type-player-side-scheme,
+.card.type-side-scheme{
+  width:var(--h);
+  height:calc(var(--h) * var(--ratio));
+}
+.card.type-main-scheme .image::before,
+.card.type-encounter-side-scheme .image::before,
+.card.type-player-side-scheme .image::before,
+.card.type-side-scheme .image::before{
+  inset:auto;
+  left:50%;top:50%;
+  width:calc(var(--h) * var(--ratio));
+  height:var(--h);
+  transform:translate(-50%,-50%) rotate(90deg);
+}
+
+.card:hover{transform:translateY(-3px);z-index:3}
+.field.mine .card:hover,.dock .card:hover{transform:translateY(-7px)}
+
+/* An exhausted card is tipped, the way you tip a card on a table. It carries
+   no label: the tilt says it, the colour draining says it, and the dock names
+   whoever is still ready. */
+.card.exhausted{transform:rotate(-5deg);margin:0 5px}
+.card.exhausted:hover{transform:rotate(-5deg) translateY(-3px)}
+.card.exhausted .image::before{filter:saturate(.45) brightness(.72)}
+
+/* Everything the client draws across the face is turned off. The numbers it
+   was drawing there are re-read and put on the edges instead. */
+.card .info{display:none}
+.card .equip,.card .auto-activate-btn,.card .badge-new{display:none}
+.card .debug-text{display:none}
+body.is-debug .card .debug-text{
+  display:block;
+  position:absolute;
+  left:2px;bottom:-13px;
+  font-family:var(--f-mono);
+  font-size:8px;
+  color:var(--faint);
+}
+
+/* ── The edges ─────────────────────────────────────────────────────────── */
+/* Every clock in this game is a bar along the bottom of the thing it counts
+   down. The two that decide the game are the same bar, enlarged onto the
+   front line. */
+.edge-meter{
+  position:absolute;
+  left:0;right:0;bottom:0;
+  height:4px;
+  border-radius:0 0 4px 4px;
+  background:rgba(11,12,17,.82);
+  overflow:hidden;
+  z-index:2;
+}
+.edge-meter i{
+  display:block;
+  height:100%;
+  width:var(--p,0%);
+  background:var(--mc,var(--hurt));
+  transition:width .45s var(--ease);
+}
+.edge-tag{
+  position:absolute;
+  left:4px;bottom:8px;
+  z-index:2;
+  display:inline-flex;
+  align-items:baseline;
+  gap:3px;
+  padding:1px 5px 2px;
+  border-radius:2px;
+  background:rgba(11,12,17,.86);
+  backdrop-filter:blur(3px);
+  font-family:var(--f-mono);
+  font-size:10px;
+  font-weight:600;
+  line-height:1.3;
+  color:var(--text);
+}
+.edge-tag em{font-style:normal;font-size:8px;font-weight:500;color:var(--muted)}
+.edge-tag.hp{color:#FFC9C9}
+.edge-tag.thr{color:#FFD3A6}
+.edge-tag.mine{color:color-mix(in srgb,var(--s,var(--seat)) 60%,#FFFFFF)}
+
+/* What has been done to a card sits above it, never on it. */
+.edge-pips{position:absolute;left:0;right:0;top:-9px;z-index:2;display:flex;gap:3px;flex-wrap:wrap}
+.edge-pip{
+  padding:1px 4px 2px;
+  border-radius:2px;
+  font-family:var(--f-mono);
+  font-size:8px;
+  font-weight:600;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  line-height:1.2;
+  background:var(--panel-3);
+  color:var(--dim);
+}
+.edge-pip.stunned{background:#3A2E12;color:#F0C767}
+.edge-pip.confused{background:#2A1F3C;color:#C2A5F0}
+.edge-pip.tough{background:#1E3040;color:#8FC4E8}
+.edge-pip.guard{background:#2A2E3C;color:#B6BFD4}
+.edge-pip.retaliate{background:#3A1F1F;color:#F0A6A6}
+
+/* Cost and what a card pays, top corners, where they are printed. */
+.card .bind-image-info{
+  position:absolute;
+  top:4px;left:4px;
+  z-index:2;
+  display:none;
+}
+.card.show-cost .bind-image-info,
+.dock .card .bind-image-info{display:block}
+.card .bind-image-info::after{
+  content:attr(data-cost);
+  display:block;
+  min-width:19px;
+  height:19px;
+  padding:0 4px;
+  border-radius:2px;
+  background:rgba(11,12,17,.88);
+  backdrop-filter:blur(3px);
+  font-family:var(--f-mono);
+  font-size:11px;
+  font-weight:600;
+  line-height:19px;
+  text-align:center;
+  color:var(--text);
+}
+.card .info_pay{
+  position:absolute;
+  top:4px;right:4px;
+  z-index:2;
+  display:flex;
+  gap:2px;
+}
+.card .info_pay div{
+  width:8px;height:8px;
+  border-radius:50%;
+  box-shadow:0 0 0 1.5px rgba(11,12,17,.8);
+}
+.res-b,.info_pay .res-b{background:var(--res-b)}
+.res-r,.info_pay .res-r{background:var(--res-r)}
+.res-y,.info_pay .res-y{background:var(--res-y)}
+.res-g,.info_pay .res-g{background:var(--res-g)}
+.res-1,.info_pay .res-1{background:var(--dim)}
+
+/* Newly drawn — a rule along the top edge in the seat's colour, not a
+   starburst across the art. */
+.card.is-new::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;top:0;
+  height:2px;
+  border-radius:4px 4px 0 0;
+  background:var(--s,var(--seat));
+  z-index:2;
+}
+
+/* ── Legality ──────────────────────────────────────────────────────────
+   The classes are the client's own. When it is waiting for a choice, what
+   you can click is the only thing at full strength — the single largest
+   thing the old table never told you. */
+.card.highlight-effect{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--seat) 62%,transparent)}
+.card.forced-action-effect{box-shadow:inset 0 0 0 2px var(--res-y)}
+.card.highlight-targets,
+.card.highlight-pay{box-shadow:inset 0 0 0 2px var(--seat),0 0 18px -4px var(--seat)}
+.card.selected{
+  box-shadow:inset 0 0 0 3px var(--seat),0 0 22px -2px var(--seat);
+  transform:translateY(-6px);
+  z-index:4;
+}
+.field.mine .card.selected,.dock .card.selected{transform:translateY(6px)}
+.dock .card.select-card-pay{opacity:.5;transform:translateY(13px)}
+
+/* While a choice is open, everything that is not part of it recedes. No JS
+   sets a mode class — the board simply asks whether a choice is on screen. */
+.table:has(.card.highlight-targets) .card:not(.highlight-targets):not(.selected),
+.table:has(.card.highlight-pay) .card:not(.highlight-pay):not(.selected){
+  opacity:.42;
+  pointer-events:none;
+}
+.table:has(.card.highlight-targets) .stack,
+.table:has(.card.highlight-pay) .stack{opacity:.42}
+
+/* How many times a target has been chosen. */
+.card[select-count]:not([select-count=""])::before{
+  content:attr(select-count);
+  position:absolute;
+  top:-8px;right:-6px;
+  z-index:5;
+  min-width:18px;height:18px;
+  border-radius:9px;
+  background:var(--seat);
+  color:var(--ink);
+  font-family:var(--f-mono);
+  font-size:10px;
+  font-weight:600;
+  line-height:18px;
+  text-align:center;
+}
+
+/* Relationships, while you hover a card that has them. */
+.card.hover_effected_to{box-shadow:inset 0 0 0 2px var(--res-y)}
+.card.hover_effected_by{box-shadow:inset 0 0 0 2px var(--res-g)}
+.card.hover_bind{box-shadow:inset 0 0 0 2px var(--res-b)}
+
+/* Movement and shuffling keep the client's own timings. */
+.card.moving,.card.shuffling{transition:transform var(--anime-move-time) linear}
+.card.activating{box-shadow:inset 0 0 0 2px var(--text)}
+
+/* A number that changed, rising off the card that changed it. */
+.change-value{
+  position:absolute;
+  left:50%;top:40%;
+  z-index:6;
+  font-family:var(--f-display);
+  font-weight:800;
+  font-size:26px;
+  line-height:1;
+  pointer-events:none;
+  animation:rise 1.05s var(--ease) forwards;
+}
+.change-value::after{content:attr(data-value)}
+.change-value.add{color:var(--res-g)}
+.change-value.sub{color:var(--hurt)}
+@keyframes rise{
+  0%{opacity:0;transform:translate(-50%,4px) scale(.85)}
+  18%{opacity:1;transform:translate(-50%,-6px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-34px) scale(1)}
+}
+
+/* ═══ Deck stacks ════════════════════════════════════════════════════════
+   A pile is one box with a count, and a discard shows what is on top of it —
+   "what just hit me" should not require opening anything. The client keeps
+   putting real card divs inside; they are stacked and hidden behind the
+   count until the pile is opened. */
+.stack{
+  position:relative;
+  flex:0 0 auto;
+  width:calc(var(--ch-sm) * var(--ratio));
+  height:var(--ch-sm);
+  border-radius:3px;
+  background:var(--panel-2);
+  box-shadow:inset 0 0 0 1px var(--rule),2px 2px 0 -1px var(--panel-2),4px 4px 0 -2px var(--panel-2);
+  transition:box-shadow .14s var(--ease);
+}
+.stack.enc{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--threat) 34%,var(--rule)),2px 2px 0 -1px var(--panel-2),4px 4px 0 -2px var(--panel-2)}
+.stack:hover{box-shadow:inset 0 0 0 1px var(--rule),2px 2px 0 -1px var(--panel-3),4px 4px 0 -2px var(--panel-3)}
+.stack .deck{
+  position:absolute;
+  inset:0;
+  border-radius:3px;
+  overflow:hidden;
+}
+/* Only the top card shows, dimmed, behind the count. */
+.stack .deck .card{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  opacity:0;
+  pointer-events:none;
+}
+.stack .deck .card:last-child{opacity:.3;filter:saturate(.5)}
+.stack.facedown .deck .card:last-child{opacity:.16}
+.stack::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:3px;
+  background:linear-gradient(to top,rgba(11,12,17,.86),rgba(11,12,17,.42));
+  pointer-events:none;
+}
+.stack-label{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:1px;
+  pointer-events:none;
+}
+.stack-n{font-family:var(--f-mono);font-size:16px;font-weight:600;line-height:1}
+.stack.out .stack-n{color:var(--faint)}
+.stack-l{font-family:var(--f-mono);font-size:8px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+
+/* An opened pile spreads over the table. */
+.stack .deck.clicked{
+  position:fixed;
+  inset:calc(var(--rail) + 20px) 90px 90px 90px;
+  z-index:70;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(0,calc(var(--ch-md) * var(--ratio))));
+  grid-auto-rows:min-content;
+  gap:10px;
+  align-content:start;
+  padding:18px;
+  border-radius:5px;
+  background:var(--panel);
+  box-shadow:inset 0 0 0 1px var(--rule),0 24px 80px rgba(0,0,0,.7);
+  overflow-y:auto;
+}
+.stack .deck.clicked .card{
+  position:relative;
+  inset:auto;
+  width:100%;
+  height:auto;
+  aspect-ratio:var(--ratio);
+  opacity:1;
+  filter:none;
+  pointer-events:auto;
+}
+.stack:has(.deck.clicked)::after,
+.stack:has(.deck.clicked) .stack-label{display:none}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   THE FRONT LINE
+
+   Marvel Champions is one question asked every turn: hit him, or hold the
+   scheme? It is a race between two clocks, and the board showed neither — you
+   read a number painted on a card and did the arithmetic.
+
+   Here the two clocks are the divider itself. The table's damage runs in from
+   the left; the scheme's threat runs in from the right. The centre is the
+   finish. Whichever fill reaches it first ends the game, and you can see
+   which is further without reading a digit.
+   ═══════════════════════════════════════════════════════════════════════ */
+.front{
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;
+  background:var(--panel);
+  border-top:1px solid var(--rule);
+  border-bottom:1px solid var(--rule);
+  z-index:5;
+  transition:background .3s var(--ease);
+}
+.side{display:flex;flex-direction:column;gap:5px;padding:9px 0 10px;min-width:0}
+.side.r{align-items:flex-end}
+.side-head{display:flex;align-items:baseline;gap:9px;padding:0 16px;min-width:0}
+.side-name{
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:19px;
+  line-height:1;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.side-num{font-family:var(--f-mono);font-size:11px;font-weight:600;white-space:nowrap}
+.side.l .side-num{color:var(--team)}
+.side.r .side-num{color:var(--threat)}
+.side-sub{
+  font-family:var(--f-mono);
+  font-size:9px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.track{position:relative;width:100%;height:10px;background:var(--panel-2);overflow:hidden}
+.track i{
+  position:absolute;
+  top:0;bottom:0;
+  width:var(--p,0%);
+  transition:width .6s var(--ease),left .6s var(--ease);
+}
+.side.l .track i{left:0;background:var(--team)}
+.side.r .track i{right:0;background:var(--threat)}
+/* The stage you are on is solid; the ones you already broke through stay
+   behind you, spent, so the bar says "second of three" without a caption. */
+.side.l .track i.done{background:color-mix(in srgb,var(--team) 38%,var(--panel-2))}
+.side.l .track i.now{left:var(--from,0%);width:var(--w,0%)}
+.track b{position:absolute;top:0;bottom:0;width:1px;background:var(--ink);left:var(--at)}
+/* Threat that is coming whatever you do. */
+.track u{
+  position:absolute;
+  top:0;bottom:0;
+  right:var(--from,0%);
+  width:var(--w,0%);
+  border-left:1px solid color-mix(in srgb,var(--threat) 80%,transparent);
+  background:repeating-linear-gradient(-45deg,
+    color-mix(in srgb,var(--threat) 52%,transparent) 0 3px,
+    transparent 3px 6px);
+  transition:right .6s var(--ease),width .6s var(--ease);
+}
+.clock{
+  align-self:stretch;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:1px;
+  padding:0 20px;
+  border-left:1px solid var(--rule);
+  border-right:1px solid var(--rule);
+  background:var(--ink);
+}
+.clock-r{
+  font-family:var(--f-display);
+  font-weight:800;
+  font-size:26px;
+  line-height:.86;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.clock-r span{font-size:11px;letter-spacing:.16em;color:var(--muted);margin-right:5px;vertical-align:2px}
+.clock-p{
+  font-family:var(--f-mono);
+  font-size:8.5px;
+  font-weight:600;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+  color:var(--seat);
+  white-space:nowrap;
+  max-width:34ch;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  transition:color .3s var(--ease);
+}
+.front.villain-turn{background:color-mix(in srgb,var(--threat) 8%,var(--panel))}
+.front.villain-turn .clock-p{color:var(--threat)}
+
+/* ═══ Dock ═══════════════════════════════════════════════════════════════
+   The acting hero's hand, their piles, what the game is asking, and the
+   button that answers it — one strip, all within a hand's reach. The hand is
+   never clipped by the bottom of the window again. */
+.dock{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:stretch;
+  background:var(--panel);
+  border-top:2px solid var(--seat);
+  z-index:6;
+  --s:var(--seat);
+  transition:border-color .25s var(--ease);
+}
+.piles{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:0 16px;
+  border-right:1px solid var(--rule-soft);
+}
+/* Every seat's piles and hand live here; only the acting seat's are shown.
+   `current_player_N` is the client's own body class. */
+.seat-piles,.hand-slot{display:none}
+body.current_player_0 .seat-piles[data-seat="0"],
+body.current_player_1 .seat-piles[data-seat="1"],
+body.current_player_2 .seat-piles[data-seat="2"],
+body.current_player_3 .seat-piles[data-seat="3"]{display:flex;gap:9px;align-items:center}
+body.current_player_0 .hand-slot[data-seat="0"],
+body.current_player_1 .hand-slot[data-seat="1"],
+body.current_player_2 .hand-slot[data-seat="2"],
+body.current_player_3 .hand-slot[data-seat="3"]{display:flex}
+
+.hand-wrap{display:flex;flex-direction:column;min-width:0;padding:0 14px}
+.hand-head{display:flex;align-items:baseline;gap:9px;height:26px;flex:0 0 auto}
+.hand-head .who{
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:15px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--seat);
+  transition:color .25s var(--ease);
+}
+.hand-slot{flex:1 1 auto;min-height:0}
+.hand-slot .area{
+  flex:1 1 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-width:0;
+  padding-bottom:12px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+}
+.hand-slot .area::-webkit-scrollbar{height:7px}
+.hand-slot .area::-webkit-scrollbar-thumb{background:var(--panel-3);border-radius:4px}
+.hand-slot .card{--h:var(--ch-hand)}
+
+/* ═══ Ask ════════════════════════════════════════════════════════════════ */
+.ask{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:9px;
+  padding:0 16px;
+  border-left:1px solid var(--rule-soft);
+  min-width:308px;
+  max-width:380px;
+}
+.ask-text{
+  display:flex;
+  gap:9px;
+  font-size:13px;
+  line-height:1.45;
+  color:var(--dim);
+  max-height:4.4em;
+  overflow:hidden;
+}
+.ask-text::before{
+  content:"";
+  flex:0 0 2px;
+  align-self:stretch;
+  background:var(--seat);
+  transition:background .2s var(--ease);
+}
+.ask.enemy .ask-text::before{background:var(--threat)}
+.ask-text b,.ask-text .effect-text,.ask-text .cost-text{font-weight:600;color:var(--text)}
+.ask-text .log-card{color:var(--text);text-decoration:underline;text-underline-offset:2px;text-decoration-color:var(--rule)}
+.ask-text{flex-wrap:wrap}
+.ask-text > span{flex:1 1 100%;min-width:0}
+.ask-text hr{
+  flex:1 1 100%;
+  height:0;
+  margin:3px 0;
+  border:none;
+  border-top:1px solid var(--rule-soft);
+}
+.ask-text .icon{font-family:var(--f-mono);font-style:normal}
+
+/* ── Resource glyphs ────────────────────────────────────────────────────
+   The client writes the cost readout as `(paid) / (cost)` with each typed
+   resource as an empty `<span class="icon-physical">`, expecting a glyph from
+   the icon font. Unstyled they are invisible, so paying a cost looked like it
+   did nothing: `() / (1)` before, `() / (1)` after. Here they are the same
+   coloured dots a card in hand already wears. */
+.icon-physical,.icon-mental,.icon-energy,.icon-wild{
+  display:inline-block;
+  width:9px;height:9px;
+  margin:0 1px;
+  border-radius:50%;
+  vertical-align:baseline;
+  box-shadow:0 0 0 1.5px rgba(11,12,17,.8);
+}
+.icon-physical{background:var(--res-r)}
+.icon-mental{background:var(--res-b)}
+.icon-energy{background:var(--res-y)}
+.icon-wild{background:var(--res-g)}
+
+/* The rest of the icon set the client can drop into a prompt or a button.
+   Named rather than pictured - a word nobody has to learn beats a glyph in a
+   font this page does not load. */
+.icon-boost,.icon-consequential,.icon-acceleration,.icon-acceleration-token,
+.icon-amplify,.icon-crisis,.icon-hazard{
+  display:inline-block;
+  margin:0 2px;
+  padding:0 4px 1px;
+  border-radius:2px;
+  background:var(--panel-3);
+  font-family:var(--f-mono);
+  font-size:8.5px;
+  font-weight:600;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--dim);
+  vertical-align:1px;
+}
+.icon-boost::after{content:"Boost"}
+.icon-consequential::after{content:"*"}
+.icon-acceleration::after,.icon-acceleration-token::after{content:"Accel"}
+.icon-amplify::after{content:"Amplify"}
+.icon-crisis::after{content:"Crisis"}
+.icon-hazard::after{content:"Hazard"}
+
+/* The client also injects a handful of Font Awesome icons at runtime, and
+   this page does not load that font either. Two of them carry meaning worth
+   keeping - the first-player flag and the save/share buttons on the game-over
+   report - so they are named. The rest sit inside controls that already have
+   a label, and are simply removed rather than left as empty boxes. */
+.fa{font-style:normal}
+.fa-flag::after{content:"First"}
+.fa-cloud-upload::after{content:"Share "}
+.fa-download::after{content:"Save "}
+.fa-shield::after{content:"Guard"}
+.fa-bookmark,.fa-check-circle-o,.fa-lock{display:none}
+
+/* Paying a cost is counting to a number. Count it out loud. */
+.pay{display:flex;align-items:center;gap:7px}
+.pay[hidden]{display:none}
+.pay-l{
+  font-family:var(--f-mono);
+  font-size:10px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.pay-pips{display:flex;gap:4px}
+.pay-pips i{
+  width:11px;height:11px;
+  border-radius:50%;
+  box-shadow:inset 0 0 0 1.5px var(--rule);
+  transition:background .18s var(--ease),box-shadow .18s var(--ease);
+}
+.pay-pips i.on{background:var(--seat);box-shadow:none}
+
+/* Forgetting a character who had not acted yet is the commonest way to lose,
+   and twice as easy with two hands. The dock says who is still standing up. */
+.ready{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px 9px;
+  padding-left:11px;
+  font-family:var(--f-mono);
+  font-size:10px;
+  letter-spacing:.05em;
+  color:var(--muted);
+}
+.ready b{font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.ready span{color:var(--dim)}
+.ready span + span::before{content:"· ";color:var(--faint)}
+.ready.none{color:var(--faint)}
+
+/* The choices the client offers. They were a floating rack in the middle of
+   the table; they belong beside the thing that confirms them. `#option-buttons`
+   is the client's own element, moved here rather than rebuilt. */
+#option-buttons{display:flex;flex-wrap:wrap;gap:4px}
+#option-buttons .button{
+  padding:5px 10px 6px;
+  border-radius:2px;
+  background:var(--panel-2);
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:15px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--dim);
+  transition:background .14s var(--ease),color .14s var(--ease);
+}
+#option-buttons .button:hover{background:var(--panel-3);color:var(--text)}
+#option-buttons .button.clicked{background:var(--seat);color:var(--ink)}
+#option-buttons .button.disable{background:transparent;color:#3F4557;cursor:not-allowed;box-shadow:inset 0 0 0 1px var(--rule-soft)}
+
+.acts{display:flex;gap:6px}
+.act{
+  flex:1;
+  min-width:0;
+  height:42px;
+  border-radius:3px;
+  font-family:var(--f-display);
+  font-weight:800;
+  font-size:19px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  transition:filter .14s var(--ease),background .14s var(--ease),color .14s var(--ease);
+}
+.act.primary{background:var(--seat);color:var(--ink)}
+.act.primary:hover:not(:disabled){filter:brightness(1.12)}
+.act.primary:disabled{background:var(--panel-2);color:#3F4557;cursor:not-allowed}
+.act.ghost{flex:0 0 auto;padding:0 15px;background:var(--panel-2);color:var(--muted)}
+.act.ghost:hover{background:var(--panel-3);color:var(--text)}
+.act.ghost.warn{color:#E8C07A}
+.act.ghost.danger{color:#F0A6A6}
+.act[hidden]{display:none}
+.act kbd{
+  display:block;
+  font-family:var(--f-mono);
+  font-size:8px;
+  font-weight:500;
+  letter-spacing:.06em;
+  opacity:.6;
+  margin-top:-3px;
+}
+
+/* ═══ Preview ════════════════════════════════════════════════════════════
+   The client's own hover panels, dressed. The card at a size you can read is
+   the whole answer to "what does this do". */
+.image-preview-div{
+  position:fixed;
+  top:50%;
+  transform:translateY(-50%);
+  width:clamp(196px,16vw,268px);
+  z-index:40;
+  pointer-events:none;
+  filter:drop-shadow(0 14px 34px rgba(0,0,0,.7));
+}
+#image-preview-div-left{left:18px}
+#image-preview-div-right{right:18px}
+/* The reveal pauses the game to show you a card. It belongs over the half of
+   the table it came from, not over the boards you are trying to read. */
+#image-preview-div-center{
+  left:50%;
+  top:calc(var(--rail) + 6px);
+  transform:translate(-50%,0);
+  width:clamp(200px,17vw,272px);
+}
+.image-preview{
+  width:100%;
+  aspect-ratio:var(--ratio);
+  border-radius:7px;
+  background-image:var(--bg-image);
+  background-size:100% 100%;
+  background-repeat:no-repeat;
+  rotate:calc(90deg * var(--rotate-times,0));
+}
+.image-preview-name{
+  margin-top:9px;
+  font-family:var(--f-mono);
+  font-size:9.5px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  text-align:center;
+}
+.image-preview-text,.image-preview-debug-text{display:none}
+
+/* ═══ Sheet — log and settings ═══════════════════════════════════════════ */
+.sheet{
+  position:fixed;
+  top:0;bottom:0;right:0;
+  width:min(384px,88vw);
+  z-index:50;
+  display:flex;
+  flex-direction:column;
+  background:var(--panel);
+  border-left:1px solid var(--rule);
+  transform:translateX(100%);
+  transition:transform .26s var(--ease);
+}
+.sheet.on{transform:none}
+.sheet-head{
+  display:flex;
+  align-items:flex-end;
+  gap:20px;
+  padding:0 18px;
+  border-bottom:1px solid var(--rule);
+  flex:0 0 auto;
+}
+.sheet-tab{
+  position:relative;
+  padding:16px 0 12px;
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:20px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  transition:color .15s var(--ease);
+}
+.sheet-tab[aria-selected="true"]{color:var(--text)}
+.sheet-tab[aria-selected="true"]::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:-1px;
+  height:2px;
+  background:var(--seat);
+}
+.sheet-x{margin-left:auto;padding-bottom:13px;font-size:17px;color:var(--muted)}
+.sheet-x:hover{color:var(--text)}
+.sheet-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 18px 22px}
+.sheet-body::-webkit-scrollbar{width:8px}
+.sheet-body::-webkit-scrollbar-thumb{background:var(--panel-3);border-radius:4px}
+
+/* The client writes each log entry as two sibling paragraphs - the step
+   number, then the sentence - so the pairing is done by the grid rather than
+   by nesting. A flex column here put every one of them on its own line and
+   tore the card names in half. */
+#history-text{
+  display:grid;
+  grid-template-columns:26px minmax(0,1fr);
+  gap:0 10px;
+  align-content:start;
+}
+#history-text > p{
+  min-width:0;
+  padding:3px 0;
+  font-size:12.5px;
+  line-height:1.5;
+  color:var(--dim);
+  overflow-wrap:break-word;
+}
+#history-text > p.log-id{
+  font-family:var(--f-mono);
+  font-size:9.5px;
+  color:#3C4356;
+  padding-top:6px;
+  text-align:right;
+}
+#history-text .log-card{
+  font-weight:600;
+  color:var(--text);
+  cursor:pointer;
+  text-decoration:underline;
+  text-underline-offset:2px;
+  text-decoration-color:var(--rule);
+}
+#contextMenu{
+  position:fixed;
+  z-index:80;
+  padding:5px;
+  border-radius:3px;
+  background:var(--panel-2);
+  box-shadow:inset 0 0 0 1px var(--rule);
+}
+#contextMenu button{
+  padding:5px 9px;
+  font-size:12px;
+  color:var(--dim);
+  border-radius:2px;
+}
+#contextMenu button:hover{background:var(--panel-3);color:var(--text)}
+
+.set-block{padding:16px 0 4px;border-bottom:1px solid var(--rule-soft)}
+.set-block:last-child{border-bottom:none}
+.set-title{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  padding:0 0 8px;
+}
+.set-title span{
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:13px;
+  letter-spacing:.17em;
+  text-transform:uppercase;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.set-title hr{flex:1;border:none;border-top:1px solid var(--rule-soft)}
+.set-row{display:flex;align-items:center;gap:12px;padding:7px 0 8px}
+.set-row label{flex:1;min-width:0;font-size:13px;color:var(--dim)}
+.set-row label small{display:block;font-size:11px;color:var(--muted)}
+.sw{
+  flex:0 0 auto;
+  width:34px;height:19px;
+  border-radius:10px;
+  background:var(--panel-3);
+  position:relative;
+  transition:background .16s var(--ease);
+}
+.sw::after{
+  content:"";
+  position:absolute;
+  top:3px;left:3px;
+  width:13px;height:13px;
+  border-radius:50%;
+  background:var(--muted);
+  transition:transform .16s var(--ease),background .16s var(--ease);
+}
+.sw[aria-checked="true"]{background:color-mix(in srgb,var(--seat) 40%,var(--panel-3))}
+.sw[aria-checked="true"]::after{transform:translateX(15px);background:var(--seat)}
+.set-actions{display:flex;flex-wrap:wrap;gap:5px;padding:4px 0 10px}
+.set-actions .button{
+  padding:5px 10px 6px;
+  border-radius:2px;
+  background:var(--panel-2);
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:14px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--dim);
+}
+.set-actions .button:hover{background:var(--panel-3);color:var(--text)}
+
+.scrim{
+  position:fixed;
+  inset:0;
+  z-index:45;
+  background:rgba(11,12,17,.5);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .22s var(--ease);
+}
+.scrim.on{opacity:1;pointer-events:auto}
+
+/* ═══ Moments ════════════════════════════════════════════════════════════ */
+#message-overlay{
+  position:fixed;
+  left:0;right:0;
+  top:calc(var(--rail) + 4px);
+  z-index:44;
+  display:flex;
+  justify-content:center;
+  pointer-events:none;
+}
+#message-text{
+  padding:7px 22px 8px;
+  border-radius:2px;
+  background:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--rule);
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:17px;
+  letter-spacing:.19em;
+  text-transform:uppercase;
+  color:var(--dim);
+  opacity:0;
+}
+#message-text.show{animation:banner 1.9s var(--ease) forwards}
+#message-text.enemy{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--threat) 55%,transparent);color:#F0BDBD}
+@keyframes banner{
+  0%{opacity:0;transform:translateY(-7px)}
+  14%,74%{opacity:1;transform:none}
+  100%{opacity:0;transform:translateY(-7px)}
+}
+
+/* ═══ Game over ══════════════════════════════════════════════════════════ */
+#game-over-box-container{
+  position:fixed;
+  inset:0;
+  z-index:90;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(11,12,17,.82);
+}
+body.game-over #game-over-box-container{display:flex}
+#game-over-box{
+  width:min(560px,92vw);
+  max-height:86vh;
+  overflow-y:auto;
+  padding:30px 30px 26px;
+  border-radius:5px;
+  background:var(--panel);
+  box-shadow:inset 0 0 0 1px var(--rule),0 30px 90px rgba(0,0,0,.7);
+}
+#game-over-text{
+  font-family:var(--f-display);
+  font-weight:800;
+  font-size:52px;
+  line-height:.9;
+  letter-spacing:.03em;
+  text-transform:uppercase;
+}
+#game-over-text-2{margin-top:10px;font-size:13.5px;line-height:1.55;color:var(--dim)}
+#game-over-buttons{display:flex;gap:6px;margin-top:20px}
+#game-over-buttons .button{
+  padding:9px 15px 10px;
+  border-radius:3px;
+  background:var(--panel-2);
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:16px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--dim);
+}
+#game-over-buttons .button:hover{background:var(--panel-3);color:var(--text)}
+#session-statistics{width:100%;margin-top:22px;border-collapse:collapse;font-family:var(--f-mono);font-size:11.5px}
+#session-statistics th,#session-statistics td{
+  padding:7px 8px;
+  text-align:left;
+  border-bottom:1px solid var(--rule-soft);
+  color:var(--dim);
+}
+#session-statistics th{color:var(--muted);font-size:9px;letter-spacing:.13em;text-transform:uppercase;cursor:pointer}
+#session-statistics img{width:38px;border-radius:2px;vertical-align:middle}
+#game-over-close{display:none}
+
+/* ═══ Connection ═════════════════════════════════════════════════════════ */
+.lost-connect{
+  position:fixed;
+  left:50%;top:calc(var(--rail) + 12px);
+  transform:translateX(-50%);
+  z-index:85;
+  padding:9px 16px 10px;
+  border-radius:3px;
+  background:var(--panel);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--threat) 50%,transparent);
+  font-size:12.5px;
+  color:#F0BDBD;
+}
+.lost-connect a{color:var(--text);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+body:has(.lost-connect:not(.hide)) .card{filter:grayscale(.5)}
+
+/* ═══ Notifications ══════════════════════════════════════════════════════ */
+.notifications{
+  position:fixed;
+  top:calc(var(--rail) + 10px);right:14px;
+  z-index:82;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  width:270px;
+  pointer-events:none;
+}
+.notifications .noti{
+  padding:9px 12px 10px;
+  border-radius:3px;
+  background:var(--panel);
+  box-shadow:inset 0 0 0 1px var(--rule);
+  font-size:12px;
+  color:var(--dim);
+}
+.notifications .notititle{
+  font-family:var(--f-mono);
+  font-size:9px;
+  font-weight:600;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.notifications .noticard.error{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--threat) 55%,transparent)}
+.notifications .timeout-bar{display:none}
+.statistics-notify-img{width:26px;border-radius:2px;vertical-align:middle;margin-right:6px}
+
+#achievement-bar{
+  position:fixed;
+  left:0;right:0;top:26vh;
+  z-index:84;
+  text-align:center;
+  font-family:var(--f-display);
+  font-weight:800;
+  font-size:44px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--res-y);
+  pointer-events:none;
+}
+#achievement-bar.remove{display:none}
+
+/* ═══ Target arrow, drawn by the client between two cards ════════════════ */
+.target-arrow-box{position:absolute;z-index:8;pointer-events:none}
+.target-arrow-box .target-arrow{background:var(--seat);height:2px;border-radius:1px;opacity:.85}
+
+/* ═══ Bits of client chrome with no home in this design ══════════════════ */
+#top-bar,#phase,#overlay-icon,#weather-background,#version,
+#prompt-box-container,#player-all-resources,
+#left-side-bar,#right-side-bar,#ex-buttons,
+.player-background,#debug-window,
+#player-mouse-0,#player-mouse-1,#player-mouse-2,#player-mouse-3{display:none !important}
+body.is-debug #debug-window{display:block !important}
+
+@media (max-width:1180px){
+  .ask{min-width:250px}
+  .rail-id{display:none}
+}
+@media (max-width:920px){
+  :root{--ch-lg:clamp(92px,15vh,148px);--ch-md:clamp(74px,12vh,118px);--ch-sm:clamp(58px,9vh,92px)}
+  .field.mine{flex-direction:column;overflow-y:auto}
+  .seat{border-left:none;border-top:1px solid var(--rule);flex:0 0 auto}
+  .seat:first-child{border-top:none}
+  .dock{grid-template-columns:auto minmax(0,1fr)}
+  .ask{grid-column:1 / -1;border-left:none;border-top:1px solid var(--rule-soft);max-width:none;padding:10px 16px}
+  .table{grid-template-rows:var(--rail) minmax(0,1fr) var(--line) minmax(0,1fr) auto}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms !important;animation-duration:.01ms !important}
+}
