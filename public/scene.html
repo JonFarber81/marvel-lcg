@@ -36,6 +36,14 @@
 
   --slate-w:376px;
 
+  /* Every picture on this page is a card, and a card is drawn the same way:
+     a title bar across the top, a rules box across the bottom, and the
+     illustration in the band between them - from about a tenth of the way
+     down to a little past halfway. This is the `object-position` that puts
+     that band in a frame wider than it is tall, so a landscape frame holds
+     the whole figure instead of a slice of its middle. */
+  --art-band:50% 19%;
+
   --f-display:"Big Shoulders Display","Big Shoulders",Impact,Haettenschweiler,sans-serif;
   --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -182,6 +190,8 @@ a{color:inherit}
   height:208px;
   overflow:hidden;
   background:var(--panel-2);
+  /* So a turned card can be sized to this frame with its sides swapped. */
+  container-type:size;
 }
 .banner-img{
   position:absolute;
@@ -189,15 +199,15 @@ a{color:inherit}
   width:100%;
   height:100%;
   object-fit:cover;
-  /* The card's stat pips run down its left edge and its rules box sits at the
-     bottom; zooming toward a point inside the illustration clears both. */
-  transform-origin:60% 22%;
+  /* The frame sits on the illustration rather than magnifying it, so the
+     villain arrives whole - head, cape and all - instead of as whatever the
+     middle of a 1.7x blow-up happened to land on. The slow drift is the same
+     move it always was, made by panning the frame instead of scaling it. */
+  object-position:50% 13%;
   opacity:0;
-  transform:scale(1.72);
-  transition:opacity .5s var(--ease),transform 7s var(--ease);
+  transition:opacity .5s var(--ease),object-position 7s var(--ease);
 }
-.banner-img.in{opacity:.94;transform:scale(1.6)}
-.banner-img.wide.in{transform:scale(1.08);transform-origin:50% 36%}
+.banner-img.in{opacity:.94;object-position:var(--art-band)}
 .banner::after{
   content:"";
   position:absolute;
@@ -428,13 +438,15 @@ a{color:inherit}
   border-left:3px solid var(--rule);
 }
 .seat.empty:hover{border-color:#39404F;background:var(--panel-2)}
+/* Wide enough to be the shape of the illustration, so the hero arrives whole
+   at the size the frame already was. At 40px it was a portrait slot holding a
+   1.7x magnification, which is how a seat came to be a shoulder. */
 .seat-art{
   flex:0 0 auto;
-  width:40px;
+  width:64px;
   height:100%;
   object-fit:cover;
-  transform:scale(1.7);
-  transform-origin:56% 20%;
+  object-position:var(--art-band);
   background:var(--panel-3);
 }
 .seat-txt{flex:1 1 auto;min-width:0;padding:0 4px}
@@ -664,28 +676,60 @@ a{color:inherit}
 
 /* Crop to the illustration and set the name in real type. A whole card at
    thumbnail size is unreadable in both halves; this way the art does the
-   recognising and the type does the reading. */
+   recognising and the type does the reading.
+
+   The crop is the illustration, not a piece of it. The frame is shaped to the
+   band the art occupies and laid over it, so every tile shows a whole figure;
+   it used to be a 1.78x magnification of one point inside that band, which on
+   most cards was a torso with the head above the frame. */
 .tile-art{
   position:relative;
-  aspect-ratio:4/3;
+  aspect-ratio:1.62;
   overflow:hidden;
   background:var(--panel-3);
+  /* So a turned card can be sized to this frame with its sides swapped. */
+  container-type:size;
 }
 .tile-art img{
   width:100%;
   height:100%;
   object-fit:cover;
-  transform:scale(1.78);
-  transform-origin:66% 20%;
+  object-position:var(--art-band);
   display:block;
   filter:saturate(.7) brightness(.78);
   transition:filter .2s var(--ease);
   opacity:0;
 }
 .tile-art img.in{opacity:1}
-.tile-art img.wide{transform:scale(1.15);transform-origin:50% 34%}
 .tile:hover .tile-art img,
 .tile[aria-pressed="true"] .tile-art img{filter:none}
+
+/* Cards printed on their side ------------------------------------------- */
+
+/* A main scheme is the one card either of these frames ever holds that is
+   printed landscape, and the server stands every landscape image up before it
+   sends it so the table can hold them all the same way. A scenario fielding a
+   team is named by its main scheme, so its banner and its tile were arriving
+   lying on their edge - a column of sideways rules text.
+
+   Turn it back. Sized to its frame with the two sides swapped, a quarter turn
+   lands it square on the frame again, and `cover` then trims the ends of the
+   card rather than a strip down one side of the picture.
+
+   This has to sit after both `.in` rules: it is no more specific than either,
+   so it is source order that decides. */
+.banner-img.turned,
+.tile-art img.turned{
+  position:absolute;
+  right:auto;
+  bottom:auto;
+  left:50%;
+  top:50%;
+  width:100cqh;
+  height:100cqw;
+  object-position:50% 50%;
+  transform:translate(-50%,-50%) rotate(90deg);
+}
 
 .tile-body{display:flex;flex-direction:column;padding:9px 11px 11px}
 .tile-name{
@@ -1240,11 +1284,13 @@ select{
   color:var(--dim);
   transition:background .14s var(--ease),color .14s var(--ease),box-shadow .14s var(--ease);
 }
+/* Wider than it is tall for the same reason the tiles are: it is the shape
+   the illustration is, so the band drops into it without magnifying. */
 .rdeck img{
-  width:28px;height:28px;
+  width:36px;height:25px;
   border-radius:2px;
   object-fit:cover;
-  object-position:50% 16%;
+  object-position:var(--art-band);
   background:var(--panel-3);
 }
 .rdeck:hover{background:var(--panel-3);color:var(--text)}
@@ -1340,7 +1386,8 @@ select{
     transition-duration:.01ms !important;
     animation-duration:.01ms !important;
   }
-  .banner-img{transform:none}
+  /* The banner's slow pan is a transition, so the rule above already stops it
+     on the frame it was heading for. */
 }
 </style>
 </head>
@@ -1809,9 +1856,9 @@ function drawSlate(){
     const src = "/" + sc.villainId
     if(img.getAttribute("src") !== src){
       img.classList.remove("in")
+      img.classList.toggle("turned", !!sc.turned)
       img.src = src
       img.onload = () => {
-        img.classList.toggle("wide", img.naturalWidth > img.naturalHeight)
         img.classList.add("in")
         if(accentCache.has(sc.base)) setAccent(accentCache.get(sc.base))
         else {
@@ -2040,10 +2087,8 @@ function drawVillains(){
     b.setAttribute("aria-pressed", String(S.scenario && S.scenario.base===sc.base))
     const art = el("span","tile-art")
     const im = el("img"); im.src = "/" + sc.villainId; im.alt = ""; im.loading = "lazy"
-    im.onload = () => {
-      if(im.naturalWidth > im.naturalHeight) im.classList.add("wide")
-      im.classList.add("in")
-    }
+    if(sc.turned) im.classList.add("turned")
+    im.onload = () => im.classList.add("in")
     art.appendChild(im)
     if(!sc.hp){
       const e = el("span","tile-multi"); e.textContent = "TEAM"
@@ -3349,6 +3394,12 @@ async function loadLive(){
     const raw = (j.villain && j.villain[0]) || (j.challenges && j.challenges[0])
              || (j.schemes && j.schemes[0]) || ""
     const villainId = String(raw).split(",")[0]
+    // A main scheme is the one card that can end up here printed landscape,
+    // and the server stands every landscape image up on its way out. So when
+    // the scheme is the face, the picture arrives on its side and the frame
+    // has to turn it back.
+    const turned = !(j.villain || [])[0] && !(j.challenges || [])[0]
+                && !!(j.schemes || [])[0]
     const card = CARD.get(villainId) || {}
     const desc = card.desc || {}
     // A weekly challenge is a villain plus a named twist; the twist is the
@@ -3364,7 +3415,7 @@ async function loadLive(){
       challengeId: chId,
       challengeName: unstar(ch.name),
       challengeText: (ch.text || "").replace(/<[^>]+>/g, ""),
-      villainId,
+      villainId, turned,
       hp: desc.HP || "", atk: desc.ATK || "", sch: desc.SCH || "", stage: desc.Stage || "",
       traits: card.traits || [],
       encounterCount: (j.encounters || []).length,

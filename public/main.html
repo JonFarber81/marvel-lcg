@@ -24,6 +24,11 @@
   --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   --ease:cubic-bezier(.22,.61,.36,1);
+  /* A card is drawn with a title bar across the top and a rules box across
+     the bottom; the illustration is the band between them. This is the
+     `object-position` that puts that band in a frame wider than it is tall.
+     The setup screen frames every picture it shows the same way. */
+  --art-band:50% 19%;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{min-height:100%}
@@ -111,14 +116,21 @@ a{color:inherit;text-decoration:none}
   box-shadow:inset 0 0 0 1px var(--threat);
 }
 .resume-art{
+  /* Taken out of flow so it cannot set the row's height. Left in it, a card
+     150px wide stands 218px tall and the row grows to match, which makes the
+     slot the shape of a whole card - and then `cover` has nothing to crop and
+     the villain arrives as a thumbnail of his own rules box. Out of flow, the
+     text sets the height, the slot comes out wider than it is tall, and the
+     frame lands on the illustration. */
+  position:absolute;
+  inset:0;
   width:100%;
   height:100%;
   object-fit:cover;
-  transform:scale(1.75);
-  transform-origin:56% 15%;
+  object-position:var(--art-band);
   background:var(--panel-2);
 }
-.resume-art-wrap{flex:0 0 96px;overflow:hidden;display:block}
+.resume-art-wrap{position:relative;flex:0 0 180px;overflow:hidden;display:block}
 .resume-txt{flex:1;min-width:0;padding:15px 20px 16px}
 .resume-kick{
   display:block;
