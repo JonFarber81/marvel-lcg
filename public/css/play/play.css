@@ -49,6 +49,11 @@
   --res-y:#E6BD48;   /* energy   */
   --res-g:#4FC26B;   /* wild     */
   --hurt:#E5484D;
+  /* Paying is its own step, and it follows the step that picks targets — so
+     it gets its own colour rather than the seat's. Otherwise the ring the
+     chosen target is still wearing and the ring on a card you can spend say
+     the same thing in the same colour at the same time. */
+  --pay:#F2C55C;
 
   --f-display:"Big Shoulders Display","Big Shoulders",Impact,Haettenschweiler,sans-serif;
   --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -553,15 +558,26 @@ body.is-debug .card .debug-text{
   text-align:center;
   color:var(--text);
 }
+/* What this card is worth if you spend it. The client only fills these in
+   while a cost is open, and they are the whole answer to "which of these
+   pays for it" — so they are read at arm's length, on a plate of their own,
+   above the ring rather than under it. */
 .card .info_pay{
   position:absolute;
-  top:4px;right:4px;
-  z-index:2;
+  top:5px;right:5px;
+  z-index:5;
   display:flex;
-  gap:2px;
+  gap:3px;
+  padding:3px;
+  border-radius:9px;
+}
+.card .info_pay.has_pay{
+  background:rgba(11,12,17,.82);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--pay) 55%,transparent);
+  backdrop-filter:blur(3px);
 }
 .card .info_pay div{
-  width:8px;height:8px;
+  width:12px;height:12px;
   border-radius:50%;
   box-shadow:0 0 0 1.5px rgba(11,12,17,.8);
 }
@@ -586,23 +602,83 @@ body.is-debug .card .debug-text{
 /* ── Legality ──────────────────────────────────────────────────────────
    The classes are the client's own. When it is waiting for a choice, what
    you can click is the only thing at full strength — the single largest
-   thing the old table never told you. */
-.card.highlight-effect{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--seat) 62%,transparent)}
-.card.forced-action-effect{box-shadow:inset 0 0 0 2px var(--res-y)}
-.card.highlight-targets,
-.card.highlight-pay{box-shadow:inset 0 0 0 2px var(--seat),0 0 18px -4px var(--seat)}
+   thing the old table never told you.
+
+   The ring is drawn on `.face::after` rather than as an inset shadow on
+   `.card`. `.face` is an absolutely positioned child filling the card and
+   `.image::before` paints the art across all of it, so a shadow inset into
+   the card itself is painted over and never appears — every one of these
+   rings was invisible. This pseudo-element sits above the art. */
+.card .face::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:3;
+  border-radius:4px;
+  pointer-events:none;
+  transition:box-shadow .16s var(--ease),background .16s var(--ease);
+}
+.card.highlight-effect .face::after{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--seat) 62%,transparent)}
+.card.forced-action-effect .face::after{box-shadow:inset 0 0 0 2px var(--res-y)}
+.card.highlight-targets .face::after{box-shadow:inset 0 0 0 2px var(--seat)}
+.card.highlight-targets{box-shadow:0 0 18px -4px var(--seat)}
+.card.highlight-pay{box-shadow:0 0 18px -4px var(--pay)}
+.card.selected .face::after{box-shadow:inset 0 0 0 3px var(--seat)}
 .card.selected{
-  box-shadow:inset 0 0 0 3px var(--seat),0 0 22px -2px var(--seat);
+  box-shadow:0 0 22px -2px var(--seat);
   transform:translateY(-6px);
   z-index:4;
 }
 .field.mine .card.selected,.dock .card.selected{transform:translateY(6px)}
-.dock .card.select-card-pay{opacity:.5;transform:translateY(13px)}
+
+/* ── Paying ────────────────────────────────────────────────────────────
+   A cost is paid by clicking cards, and until you know that, a cost cannot
+   be paid at all. So a card you can spend wears a ring in the pay colour and
+   lifts under the pointer, and a card you have spent is pushed down out of
+   the hand — laid on the table — at full strength rather than faded, because
+   fading is what this board says about things you cannot use. */
+.card.highlight-pay .face::after{
+  box-shadow:inset 0 0 0 2px var(--pay),inset 0 0 26px -10px var(--pay);
+}
+.dock .card.highlight-pay:not(.selected):hover,
+.field .card.highlight-pay:not(.selected):hover{transform:translateY(-9px)}
+.card.select-card-pay .face::after{
+  box-shadow:inset 0 0 0 3px var(--pay);
+  background:color-mix(in srgb,var(--pay) 15%,transparent);
+}
+.dock .card.select-card-pay,
+.field .card.select-card-pay{
+  opacity:1;
+  transform:translateY(15px) scale(.94);
+  z-index:4;
+}
+/* Spent, in a word, on the card itself. */
+.card.select-card-pay .face::before{
+  content:"Spent";
+  position:absolute;
+  left:0;right:0;bottom:0;
+  z-index:4;
+  padding:2px 0 3px;
+  background:var(--pay);
+  font-family:var(--f-mono);
+  font-size:9px;
+  font-weight:600;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  text-align:center;
+  color:var(--ink);
+}
 
 /* While a choice is open, everything that is not part of it recedes. No JS
-   sets a mode class — the board simply asks whether a choice is on screen. */
-.table:has(.card.highlight-targets) .card:not(.highlight-targets):not(.selected),
-.table:has(.card.highlight-pay) .card:not(.highlight-pay):not(.selected){
+   sets a mode class — the board simply asks whether a choice is on screen.
+
+   Paying comes after choosing targets, and the target it chose keeps its
+   highlight while you pay. So the pay clause has to win outright: while
+   anything is payable, the target clause is off. It was not, and the whole
+   hand inherited `pointer-events:none` from it — the cost step asked for two
+   resources and then refused every click that could have paid them. */
+.table:has(.card.highlight-pay) .card:not(.highlight-pay):not(.selected),
+.table:not(:has(.card.highlight-pay)):has(.card.highlight-targets) .card:not(.highlight-targets):not(.selected){
   opacity:.42;
   pointer-events:none;
 }
@@ -627,13 +703,13 @@ body.is-debug .card .debug-text{
 }
 
 /* Relationships, while you hover a card that has them. */
-.card.hover_effected_to{box-shadow:inset 0 0 0 2px var(--res-y)}
-.card.hover_effected_by{box-shadow:inset 0 0 0 2px var(--res-g)}
-.card.hover_bind{box-shadow:inset 0 0 0 2px var(--res-b)}
+.card.hover_effected_to .face::after{box-shadow:inset 0 0 0 2px var(--res-y)}
+.card.hover_effected_by .face::after{box-shadow:inset 0 0 0 2px var(--res-g)}
+.card.hover_bind .face::after{box-shadow:inset 0 0 0 2px var(--res-b)}
 
 /* Movement and shuffling keep the client's own timings. */
 .card.moving,.card.shuffling{transition:transform var(--anime-move-time) linear}
-.card.activating{box-shadow:inset 0 0 0 2px var(--text)}
+.card.activating .face::after{box-shadow:inset 0 0 0 2px var(--text)}
 
 /* A number that changed, rising off the card that changed it. */
 .change-value{
@@ -1012,25 +1088,46 @@ body.current_player_3 .hand-slot[data-seat="3"]{display:flex}
 .fa-shield::after{content:"Guard"}
 .fa-bookmark,.fa-check-circle-o,.fa-lock{display:none}
 
-/* Paying a cost is counting to a number. Count it out loud. */
-.pay{display:flex;align-items:center;gap:7px}
+/* Paying a cost is counting to a number. Count it out loud — and say how the
+   counting is done, because nothing else on screen does. */
+.pay{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:4px 9px;
+  padding:7px 10px;
+  border-radius:3px;
+  background:color-mix(in srgb,var(--pay) 9%,var(--panel-2));
+  box-shadow:inset 2px 0 0 var(--pay);
+}
 .pay[hidden]{display:none}
 .pay-l{
-  font-family:var(--f-mono);
-  font-size:10px;
-  letter-spacing:.1em;
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:15px;
+  letter-spacing:.11em;
   text-transform:uppercase;
-  color:var(--muted);
+  color:var(--text);
   white-space:nowrap;
 }
 .pay-pips{display:flex;gap:4px}
 .pay-pips i{
-  width:11px;height:11px;
+  width:13px;height:13px;
   border-radius:50%;
-  box-shadow:inset 0 0 0 1.5px var(--rule);
+  box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--pay) 45%,transparent);
   transition:background .18s var(--ease),box-shadow .18s var(--ease);
 }
-.pay-pips i.on{background:var(--seat);box-shadow:none}
+.pay-pips i.on{background:var(--pay);box-shadow:none}
+/* Paid past the price. The rules allow it; the readout should not pretend it
+   is the same thing as paying exactly. */
+.pay-pips i.over{background:none;box-shadow:inset 0 0 0 1.5px var(--pay),inset 0 0 0 4px color-mix(in srgb,var(--pay) 35%,transparent)}
+.pay-hint{
+  flex:1 1 100%;
+  font-family:var(--f-mono);
+  font-size:10px;
+  letter-spacing:.06em;
+  color:var(--dim);
+}
 
 /* Forgetting a character who had not acted yet is the commonest way to lose,
    and twice as easy with two hands. The dock says who is still standing up. */

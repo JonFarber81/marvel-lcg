@@ -663,11 +663,20 @@ export class View {
             q('#pay-l')!.textContent = 'Pay ' + cost.need
             const pips = q('#pay-pips')!
             pips.textContent = ''
-            for (let i = 0; i < cost.need; i++) {
+            // Overpaying is legal, so the row grows rather than stopping at
+            // the price: the pips past it are drawn hollow.
+            for (let i = 0; i < Math.max(cost.need, cost.paid); i++) {
                 const p = el('i')
-                if (i < cost.paid) p.className = 'on'
+                if (i < cost.paid) p.className = i < cost.need ? 'on' : 'on over'
                 pips.appendChild(p)
             }
+            // Nothing else on the screen says that a cost is paid by clicking
+            // cards, and a cost you do not know how to pay is a dead end.
+            const left = cost.need - cost.paid
+            q('#pay-hint')!.textContent =
+                left > 0 ? 'Click the outlined cards to spend them'
+                : left < 0 ? 'Paying ' + (-left) + ' more than it costs'
+                : 'Paid — click a spent card to take it back'
         }
 
         // The affirmative action, in the words of the thing it will do.
@@ -711,21 +720,36 @@ export class View {
         return Math.max(0, min - have) || (have ? 0 : 1)
     }
 
+    /* How many resources a cost or resource string is worth. A digit is that
+       many generic resources; a letter is one of that type. */
+    static resourceCount(text: string): number {
+        let n = 0
+        for (const ch of String(text || '')) {
+            if (ch >= '0' && ch <= '9') n += Number(ch)
+            else if (/[RBYG]/.test(ch)) n += 1
+        }
+        return n
+    }
+
     /* How much this costs and how much is down, or null when nothing is being
-       paid for. A digit in the cost string is that many generic resources; a
-       letter is one of that type. */
+       paid for. `resources` holds one entry per card put down, but a card can
+       be worth more than one resource — Energy is two — so what is down is the
+       sum of what each card gives, not how many cards there are. */
     static costState(): { need: number, paid: number } | null {
         const obj: any = (Effect as any).select_effect_obj
         if (!obj || typeof obj.getCost !== 'function') return null
         const end = q<HTMLButtonElement>('#btn-end')
         if (!end || !/Cancel\s*Pay/i.test(clean(end.innerHTML))) return null
-        let need = 0
-        for (const ch of String(obj.getCost() || '')) {
-            if (ch >= '0' && ch <= '9') need += Number(ch)
-            else if (/[RBYG]/.test(ch)) need += 1
-        }
+        const need = View.resourceCount(obj.getCost())
         if (!need) return null
-        return { need, paid: (obj.resources || []).length }
+        const all: number[] = obj.getResources ? obj.getResources() : []
+        const text: string[] = obj.getResText ? obj.getResText() : []
+        let paid = 0
+        for (const id of (obj.resources || [])) {
+            const i = all.indexOf(id)
+            paid += i === -1 ? 1 : View.resourceCount(text[i])
+        }
+        return { need, paid }
     }
 }
 
