@@ -141,6 +141,15 @@ input[type="button"] {
     filter: drop-shadow(1px 2px 3px orangered);
 }
 
+/* The expert cut of a scenario is a separate tile with the same villain art as
+   the standard one, so it carries a red ring of its own. Selection is red too,
+   but drawn solid and tight against the art; this one is dashed and stands off
+   it, so a selected expert tile reads as two distinct rings. */
+#set-content button.expert {
+    outline: var(--border-width) dashed red;
+    outline-offset: calc(var(--border-width) + 1px);
+}
+
 #set-content button {
     position: relative;
     margin: 2px;

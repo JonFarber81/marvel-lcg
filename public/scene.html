@@ -960,6 +960,14 @@ async function createScenarios() {
         async function createButtons(text) {
             var option = document.createElement("button");
             option.value = text;
+            // The standard and expert cut of a scenario share the same villain
+            // art and sit side by side, so the expert one wears a red ring.
+            // Unmarked, the pair is two identical tiles and picking the wrong
+            // one costs a whole game played at the wrong difficulty.
+            if( text.endsWith('_expert') ) {
+                option.classList.add('expert')
+                option.title = 'Expert'
+            }
             if( !file_names.includes(text) ) {
                 option.disabled = true
                 option.textContent = getFileName(text);
