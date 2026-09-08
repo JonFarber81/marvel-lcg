@@ -56,7 +56,11 @@
 
     <script>
         async function get_version(params) {
-            const response_version = await fetch(`/get_version`);
+            // Never from cache. Older builds served this endpoint as a
+            // year-cached image, so a browser arriving from one still holds a
+            // copy naming the version it is stuck on - and asking politely
+            // would just be told that same answer forever.
+            const response_version = await fetch(`/get_version`, {cache: 'no-store'});
             const version_text = await response_version.text()
             return version_text
         }
