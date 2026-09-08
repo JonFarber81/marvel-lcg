@@ -1,397 +1,375 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <script src="/public/js/version_guard.js"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marvel Champions: Digital Edition</title>
-    <style>
-        body {
-            background-color: rgb(43, 43, 43);
-            color: rgb(198, 198, 198);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            font-family: Arial, sans-serif;
-            margin: 0;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="/public/js/version_guard.js"></script>
+<title>Marvel Champions: Digital Edition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0B0C11;
+  --panel:#13151D;
+  --panel-2:#1A1D27;
+  --rule:#282D3A;
+  --rule-soft:#1E222C;
+  --text:#E9EBF1;
+  --dim:#A2A8BA;
+  --muted:#767D92;
+  --threat:#5A79A8;
+  --threat-ink:#0B0C11;
+  --f-display:"Big Shoulders Display","Big Shoulders",Impact,Haettenschweiler,sans-serif;
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%}
+body{
+  background:var(--ink);
+  color:var(--text);
+  font-family:var(--f-ui);
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:48px 32px;
+  min-height:100vh;
+}
+button{background:none;border:none;cursor:pointer;font:inherit;color:inherit}
+/* .resume sets display:flex, which outranks the hidden attribute's own rule. */
+[hidden]{display:none !important}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--threat);outline-offset:3px;border-radius:2px}
 
-        .menu {
-            text-align: center;
-        }
+.wrap{
+  display:grid;
+  grid-template-columns:minmax(0,auto) minmax(0,1fr);
+  gap:clamp(40px,7vw,104px);
+  align-items:start;
+  width:100%;
+  max-width:1000px;
+}
 
-        .custom-btn {
-            width: 130px;
-            height: 40px;
-            color: #fff;
-            padding: 10px 25px;
-            font-family: 'Lato', sans-serif;
-            font-weight: 500;
-            background: transparent;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            display: inline-block;
-            box-shadow:inset 2px 2px 2px 0px rgba(255,255,255,.5),
-            7px 7px 20px 0px rgba(0,0,0,.1),
-            4px 4px 5px 0px rgba(0,0,0,.1);
-            outline: none;
-        }
-        /* 3 */
-        .btn-3 {
-            background: rgb(0, 172, 238);
-            background: linear-gradient(0deg, rgba(0, 172, 238, 1) 0%, rgba(2, 126, 251, 1) 100%);
-            width: 130px;
-            height: 40px;
-            line-height: 42px;
-            padding: 0;
-            border: none;
+/* ── Wordmark ─────────────────────────────────────────────────────────── */
+.mark{padding-top:6px}
+.mark h1{
+  font-family:var(--f-display);
+  font-weight:800;
+  font-size:clamp(52px,7.2vw,88px);
+  line-height:.83;
+  letter-spacing:-.008em;
+  text-transform:uppercase;
+}
+.mark h1 span{display:block}
+.mark hr{
+  width:56px;
+  margin:20px 0 14px;
+  border:none;
+  border-top:2px solid var(--threat);
+}
+.mark h2{
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:17px;
+  letter-spacing:.28em;
+  text-transform:uppercase;
+  color:var(--dim);
+}
+.mark .ver{
+  margin-top:26px;
+  font-family:var(--f-mono);
+  font-size:11px;
+  color:#4E5568;
+}
 
-        }
+/* ── Continue ─────────────────────────────────────────────────────────────
+   The one destination that is not always there. It carries the villain's own
+   art and the colour drawn from it, so the game you left is the only thing on
+   this page wearing any colour at all. */
+.resume{
+  display:flex;
+  align-items:stretch;
+  gap:0;
+  width:100%;
+  margin-bottom:26px;
+  border-radius:4px;
+  overflow:hidden;
+  background:var(--panel);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--threat) 42%,transparent);
+  text-align:left;
+  transition:box-shadow .16s var(--ease),background .16s var(--ease);
+}
+.resume{cursor:pointer;border:none;font:inherit;color:inherit;text-align:left}
+.resume:disabled{opacity:.6;cursor:default}
+.resume:hover{
+  background:var(--panel-2);
+  box-shadow:inset 0 0 0 1px var(--threat);
+}
+.resume-art{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  transform:scale(1.75);
+  transform-origin:56% 15%;
+  background:var(--panel-2);
+}
+.resume-art-wrap{flex:0 0 96px;overflow:hidden;display:block}
+.resume-txt{flex:1;min-width:0;padding:15px 20px 16px}
+.resume-kick{
+  display:block;
+  font-family:var(--f-mono);
+  font-size:9.5px;
+  font-weight:600;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--threat);
+}
+.resume-name{
+  display:block;
+  margin-top:4px;
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:27px;
+  line-height:1.05;
+  text-transform:uppercase;
+}
+.resume-sub{
+  display:block;
+  margin-top:3px;
+  font-size:12.5px;
+  color:var(--muted);
+}
+.resume-go{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  padding:0 20px;
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:19px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--threat);
+}
 
-        .btn-3 span {
-            position: relative;
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
+/* ── Destinations ─────────────────────────────────────────────────────────
+   Eight identical buttons said only their own names. A row per destination
+   has room to say what is behind it. */
+.menu{border-top:1px solid var(--rule-soft)}
+.dest{
+  display:flex;
+  align-items:baseline;
+  gap:20px;
+  width:100%;
+  padding:15px 4px 16px;
+  border-bottom:1px solid var(--rule-soft);
+  text-align:left;
+  transition:padding-left .18s var(--ease),background .16s var(--ease);
+}
+.dest:hover,.dest:focus-visible{padding-left:12px;background:var(--panel)}
+.dest-name{
+  flex:0 0 auto;
+  min-width:168px;
+  font-family:var(--f-display);
+  font-weight:700;
+  font-size:26px;
+  line-height:1;
+  letter-spacing:.075em;
+  text-transform:uppercase;
+  color:var(--dim);
+  transition:color .16s var(--ease);
+}
+.dest:hover .dest-name,.dest:focus-visible .dest-name{color:var(--text)}
+.dest-desc{flex:1;min-width:0;font-size:13px;color:var(--muted)}
+.dest-arrow{
+  flex:0 0 auto;
+  font-family:var(--f-mono);
+  font-size:14px;
+  color:var(--rule);
+  transition:color .16s var(--ease),transform .18s var(--ease);
+}
+.dest:hover .dest-arrow,.dest:focus-visible .dest-arrow{
+  color:var(--threat);
+  transform:translateX(3px);
+}
 
-        .btn-3:before,
-        .btn-3:after {
-            position: absolute;
-            content: "";
-            right: 0;
-            top: 0;
-            background: rgba(2, 126, 251, 1);
-            transition: all 0.3s ease;
-        }
+/* ── Missing art notice ───────────────────────────────────────────────── */
+.notice{
+  margin-top:26px;
+  padding:11px 14px 12px;
+  border-radius:3px;
+  border-left:2px solid #D8A53A;
+  background:#1C1809;
+  font-size:12.5px;
+  line-height:1.55;
+  color:#E8D5A6;
+}
+.notice code{font-family:var(--f-mono);font-size:11.5px;color:#FFF0CC}
+.notice a{color:#FFD166;text-decoration:underline;text-underline-offset:2px}
 
-        .btn-3:before {
-            height: 0%;
-            width: 2px;
-        }
-
-        .btn-3:after {
-            width: 0%;
-            height: 2px;
-        }
-
-        .btn-3:hover {
-            background: transparent;
-            box-shadow: none;
-        }
-
-        .btn-3:hover:before {
-            height: 100%;
-        }
-
-        .btn-3:hover:after {
-            width: 100%;
-        }
-
-        .btn-3 span:hover {
-            color: rgba(2, 126, 251, 1);
-        }
-
-        .btn-3 span:before,
-        .btn-3 span:after {
-            position: absolute;
-            content: "";
-            left: 0;
-            bottom: 0;
-            background: rgba(2, 126, 251, 1);
-            transition: all 0.3s ease;
-        }
-
-        .btn-3 span:before {
-            width: 2px;
-            height: 0%;
-        }
-
-        .btn-3 span:after {
-            width: 0%;
-            height: 2px;
-        }
-
-        .btn-3 span:hover:before {
-            height: 100%;
-        }
-
-        .btn-3 span:hover:after {
-            width: 100%;
-        }
-
-        button:disabled {
-            filter: grayscale(1);
-            transition: none;
-        }
-        
-        button:disabled span:before,
-        button:disabled span:after,
-        button:disabled:before,
-        button:disabled:after {
-            transition: none;
-            /* content: unset; */
-        }
-
-        #version {
-            height: 2rem;
-        }
-
-        .wild-mode {
-            background: rgb(161, 129, 0);
-        }
-
-        /* Continue is the one button that is not always there - it appears only
-           when the autosave slot holds an unfinished game - so it is coloured
-           apart from the rest rather than sitting in the row unremarked. */
-        .continue-btn {
-            background: rgb(0, 158, 96);
-            background: linear-gradient(0deg, rgba(0, 158, 96, 1) 0%, rgba(0, 122, 74, 1) 100%);
-        }
-
-        .continue-btn:before,
-        .continue-btn:after {
-            background: rgba(0, 122, 74, 1);
-        }
-
-        #continue-detail {
-            display: none;
-            margin: .8rem auto 0;
-            max-width: 32rem;
-            color: rgb(160, 160, 160);
-            font-size: .9rem;
-            line-height: 1.5;
-        }
-
-        #continue-detail.show {
-            display: block;
-        }
-
-        /* Shown only when the downloaded art pack is missing. Nothing else on
-           the page says so: the game runs, it just draws every card itself. */
-        #assets-banner {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 10000;
-            display: none;
-            padding: .6rem 1rem;
-            background-color: #3a2e14;
-            border-bottom: 1px solid #d8a53a;
-            color: #ffe3a8;
-            text-align: left;
-            line-height: 1.5;
-        }
-
-        #assets-banner.show {
-            display: block;
-        }
-
-        #assets-banner a {
-            color: #ffd166;
-        }
-
-        #assets-banner code {
-            color: #fff2d0;
-        }
-
-        body.has-assets-banner {
-            padding-top: 6rem;
-        }
-    </style>
+@media (max-width:840px){
+  body{align-items:flex-start;padding:40px 22px}
+  .wrap{grid-template-columns:1fr;gap:38px}
+  .mark h1{font-size:clamp(46px,13vw,72px)}
+  .dest{gap:12px;flex-wrap:wrap}
+  .dest-name{min-width:0;flex:1 1 100%;font-size:23px}
+  .dest-desc{flex:1 1 auto;font-size:12.5px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms !important}
+}
+</style>
 </head>
-
 <body>
 
-    <div id="assets-banner" role="alert"></div>
+<div class="wrap">
 
-    <div class="menu">
-        <h1>Marvel Champions</h1>
-        <h2>Digital Edition</h2>
-        <div id="version"></div>
-        <div style="margin-bottom: 5rem;"></div>
-        <script>
-            function Open(url) {
-                window.location.href = url
-            }
-        </script>
+  <div class="mark">
+    <h1><span>Marvel</span><span>Champions</span></h1>
+    <hr>
+    <h2>Digital Edition</h2>
+    <div class="ver" id="ver"></div>
+  </div>
 
-        <style>
-            .main{
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 5px;
-            }
-        </style>
+  <div>
+    <button class="resume" id="resume" type="button" hidden>
+      <span class="resume-art-wrap"><img class="resume-art" id="resume-art" alt=""></span>
+      <span class="resume-txt">
+        <span class="resume-kick">Saved game</span>
+        <span class="resume-name" id="resume-name"></span>
+        <span class="resume-sub" id="resume-sub"></span>
+      </span>
+      <span class="resume-go">Continue &#8594;</span>
+    </button>
 
-        <div class="main">
-            <button id="continue-btn" class="custom-btn btn-3 continue-btn" style="display: none;" onclick="doContinue()">
-                <span>Continue</span>
-            </button>
-            <button class="custom-btn btn-3" onclick="Open('scene')">
-                <span>New Game</span>
-            </button>
-            <button class="custom-btn btn-3" onclick="Open('tutorial')">
-                <span>How to Play</span>
-            </button>
-            <button class="custom-btn btn-3" onclick="Open('replay')">
-                <span>Replay</span>
-            </button>
-            <button class="custom-btn btn-3" onclick="Open('deck')">
-                <span>Deck Editor</span>
-            </button>
-            <button class="custom-btn btn-3" onclick="Open('cards')">
-                <span>View Cards</span>
-            </button>
-            <button class="custom-btn btn-3" onclick="Open('puzzle')">
-                <span>Puzzle</span>
-            </button>
-            <button class="custom-btn btn-3" onclick="Open('credits')">
-                <span>Credits</span>
-            </button>
-        </div>
+    <nav class="menu" id="menu"></nav>
 
-        <div id="continue-detail"></div>
+    <div class="notice" id="notice" hidden></div>
+  </div>
 
-        <!-- <hr/>
+</div>
 
-        <div class="main">
-            <button class="custom-btn btn-3 wild-mode" onclick="doReplay('./wild.json')">
-                <span>Wild Mode</span>
-            </button>
-        </div> -->
-    </div>
+<script>
+const DESTS = [
+  ["New game",   "scene",    "Pick a scenario, your heroes, and the difficulty."],
+  ["How to play","tutorial", "The rules, the controls, and a guided first game."],
+  ["Replay",     "replay",   "Watch a recorded game play itself back."],
+  ["Deck editor","deck",     "Build a hero deck, or edit one you already have."],
+  ["View cards", "cards",    "Browse every card in the collection."],
+  ["Puzzle",     "puzzle",   "Solve a set board state — one position, one way out."],
+  ["Credits",    "credits",  "Who made this, and what it was built on."],
+]
 
-    <script>
-        // Function to get a cookie
-        function getCookie(name) {
-            let nameEQ = name + "=";
-            let ca = document.cookie.split(';');
-            for(let i=0; i < ca.length; i++) {
-                let c = ca[i];
-                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-            }
-            return null;
-        }
+const $ = s => document.querySelector(s)
 
-        (async () => {
-            // const response_version = await fetch(`get_version?`);
-            // version = await response_version.text();
-            const version = getCookie('app_version')
-            const versionElement = document.querySelector(`#version`);
-            versionElement.innerHTML = `v${version}`;
-        })()
-    </script>
-
-    <script>
-        /** The art pack is downloaded separately (install guide step 6), and a
-         * checkout without it still starts and still plays - every card is just
-         * drawn as a grey stand-in, with nothing on screen to say why. The
-         * server checked for it once at start-up; this reports that answer. */
-        (async () => {
-            const banner = document.getElementById('assets-banner')
-            let status
-            try {
-                const response = await fetch('get_assets_status')
-                if( !response.ok ) {
-                    return
-                }
-                status = await response.json()
-            } catch( err ) {
-                // An older server has no such route, and a menu that cannot
-                // reach one has bigger problems than missing art.
-                return
-            }
-            if( !status || !status.missing ) {
-                return
-            }
-            banner.innerHTML = `Card art is missing - <code>${status.folder}</code> is not there, `
-                + `so every card is drawn as a placeholder. `
-                + `Download the game from <a href="${status.url}" target="_blank" rel="noopener">itch.io</a> `
-                + `and put its <code>assets</code> folder in the project root `
-                + `(install guide step 6), then restart.`
-            banner.classList.add('show')
-            document.body.classList.add('has-assets-banner')
-        })()
-    </script>
-
-    <script>
-        /** The game autosaves at the end of every villain phase (improvements
-         * 4.2), into one slot. When that slot holds an unfinished game the menu
-         * grows a Continue button that says which game it is - there is no
-         * other way back into it, and a menu that offered "Continue" with
-         * nothing behind it would be worse than none. */
-        function doContinue() {
-            const button = document.getElementById('continue-btn')
-            button.disabled = true
-            fetch('continue_game').then(response => {
-                if( !response.ok ) {
-                    // The game finished in another tab while this menu sat open.
-                    button.style.display = 'none'
-                    document.getElementById('continue-detail').classList.remove('show')
-                    button.disabled = false
-                    return
-                }
-                window.location.href = '.?hot_seat&3d_scene'
-            }).catch(() => {
-                button.disabled = false
-            })
-        }
-
-        (async () => {
-            let status
-            try {
-                const response = await fetch('get_autosave_status')
-                if( !response.ok ) {
-                    return
-                }
-                status = await response.json()
-            } catch( err ) {
-                // An older server has no such route; the menu is the same
-                // without the button.
-                return
-            }
-            if( !status || !status.exists ) {
-                return
-            }
-
-            document.getElementById('continue-btn').style.display = ''
-
-            const heroes = (status.names || []).join(', ')
-            const scenario = status.scenario + (status.expert ? ' (Expert)' : '')
-            const round = status.round > 0 ? `round ${status.round}` : 'the first round'
-            const detail = document.getElementById('continue-detail')
-            detail.textContent = heroes
-                ? `${heroes} vs ${scenario} - saved at the end of ${round}.`
-                : `${scenario} - saved at the end of ${round}.`
-            if( status.time ) {
-                detail.textContent += ` Started ${status.time}.`
-            }
-            detail.classList.add('show')
-        })()
-    </script>
-
-    <script>
-function doReplay(file_name) {
-    var ajax = new XMLHttpRequest();
-    let cmd = `load_replay?${file_name}`
-    ajax.open("GET", cmd, true);
-    ajax.onreadystatechange = function () {
-        if( this.readyState == 4 ) {
-            console.log('ok')
-            cmd = ".?hot_seat&3d_scene"
-            window.open(cmd)
-        }
-    }
-    ajax.send();
+/* The menu wears the colour of the game waiting in the autosave slot, drawn
+   from that villain's own artwork — the same accent the setup screen uses. */
+function accentFrom(img){
+  const c = document.createElement("canvas"); c.width = 64; c.height = 64
+  const x = c.getContext("2d", {willReadFrequently:true})
+  const sy = img.naturalHeight * 0.08, sh = img.naturalHeight * 0.44
+  x.drawImage(img, 0, sy, img.naturalWidth, sh, 0, 0, 64, 64)
+  const d = x.getImageData(0,0,64,64).data
+  const bins = new Array(24).fill(0)
+  for(let i=0;i<d.length;i+=4){
+    const r=d[i]/255,g=d[i+1]/255,b=d[i+2]/255
+    const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,dl=mx-mn
+    if(l<.12||l>.94||dl<.14) continue
+    let h
+    if(mx===r) h=((g-b)/dl+6)%6
+    else if(mx===g) h=(b-r)/dl+2
+    else h=(r-g)/dl+4
+    bins[Math.floor(h*60/15)%24] += dl*dl
+  }
+  let best=0
+  for(let i=1;i<24;i++) if(bins[i]>bins[best]) best=i
+  return bins[best] ? `hsl(${best*15+7} 58% 60%)` : null
 }
-    </script>
 
+function drawMenu(){
+  const m = $("#menu")
+  for(const [name, href, desc] of DESTS){
+    const a = document.createElement("a")
+    a.className = "dest"; a.href = href
+    a.innerHTML = `<span class="dest-name">${name}</span>`
+                + `<span class="dest-desc">${desc}</span>`
+                + `<span class="dest-arrow">&#8594;</span>`
+    m.appendChild(a)
+  }
+}
+
+function showResume(s){
+  const row = $("#resume")
+  row.hidden = false
+  row.onclick = async () => {
+    row.disabled = true
+    try{
+      const r = await fetch("continue_game")
+      if(!r.ok){
+        // The game ended in another tab while this menu sat open.
+        row.hidden = true
+        return
+      }
+      window.location.href = ".?hot_seat&3d_scene"
+    }catch(e){
+      row.disabled = false
+    }
+  }
+  $("#resume-name").textContent = s.scenario
+  const heroes = (s.names || []).join(" & ")
+  const round = s.round > 0 ? `saved at the end of round ${s.round}` : "saved in the first round"
+  $("#resume-sub").textContent =
+    [heroes, s.expert ? "Expert" : "Standard", round].filter(Boolean).join(" · ")
+  // The slot reports the villain as the card pair it was set up with.
+  const villain = String(s.villain || "").split(",")[0]
+  if(villain){
+    const img = $("#resume-art")
+    img.src = "/" + villain
+    img.onload = () => {
+      const a = accentFrom(img)
+      if(a) document.documentElement.style.setProperty("--threat", a)
+    }
+  }
+}
+
+;(async () => {
+  drawMenu()
+  $("#ver").textContent = "v" + (document.cookie.match(/app_version=([^;]+)/)?.[1] || "")
+
+  // A demo save so the Continue row can be seen without playing a game first.
+  if(new URLSearchParams(location.search).has("demo")){
+    showResume({names:["Spider-Man","She-Hulk"], scenario:"Klaw", round:3,
+                expert:true, villain:"01114"})
+  } else {
+    try{
+      const r = await fetch("get_autosave_status")
+      if(r.ok){
+        const s = await r.json()
+        if(s && s.exists) showResume(s)
+      }
+    }catch(e){ /* an older server has no such route; the menu is the same without it */ }
+  }
+
+  try{
+    const r = await fetch("get_assets_status")
+    if(r.ok){
+      const s = await r.json()
+      if(s && s.missing){
+        const n = $("#notice")
+        n.hidden = false
+        n.innerHTML = `Card art is missing — <code>${s.folder}</code> is not there, so every card `
+          + `is drawn as a placeholder. Download the game from `
+          + `<a href="${s.url}" target="_blank" rel="noopener">itch.io</a> and put its `
+          + `<code>assets</code> folder in the project root, then restart.`
+      }
+    }
+  }catch(e){ /* same */ }
+})()
+</script>
 </body>
-
 </html>
